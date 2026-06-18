@@ -1,0 +1,25 @@
+{
+  "name": "ReExpo92.WorldKit.Cesium",
+  "rootNamespace": "ReExpo92.WorldKit.Cesium",
+  "references": [
+    "ReExpo92.WorldKit",
+    "CesiumRuntime"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [
+    "REEXPO_CESIUM"
+  ],
+  "versionDefines": [
+    {
+      "name": "com.cesium.unity",
+      "expression": "",
+      "define": "REEXPO_CESIUM"
+    }
+  ],
+  "noEngineReferences": false
+}

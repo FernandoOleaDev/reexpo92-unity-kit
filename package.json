@@ -1,0 +1,26 @@
+{
+  "name": "com.reexpo92.worldkit",
+  "version": "0.1.0",
+  "displayName": "re-Expo92 WorldKit",
+  "description": "Mundo 3D georreferenciado de la Isla de la Cartuja para construir la recreación de la Expo 92: importa POIs y zonas desde Supabase y monta la maqueta fotorrealista (Google Photorealistic 3D Tiles vía Cesium for Unity) como referencia en el editor. Incluye asistente de configuración y panel de control. Solo desarrolladores/colaboradores de re-Expo92.",
+  "unity": "6000.3",
+  "unityRelease": "17f1",
+  "license": "MIT",
+  "author": {
+    "name": "re-Expo92",
+    "url": "https://github.com/FernandoOleaDev/reexpo92-unity-kit"
+  },
+  "documentationUrl": "https://github.com/FernandoOleaDev/reexpo92-unity-kit#readme",
+  "changelogUrl": "https://github.com/FernandoOleaDev/reexpo92-unity-kit/blob/main/CHANGELOG.md",
+  "keywords": ["expo92", "georeferencing", "cesium", "gis", "cartuja", "editor"],
+  "dependencies": {
+    "com.unity.nuget.newtonsoft-json": "3.2.1"
+  },
+  "samples": [
+    {
+      "displayName": "Demo Cartuja",
+      "description": "Escena de ejemplo: construye el rig georreferenciado de la Cartuja con los POIs y zonas reales de re-Expo92.",
+      "path": "Samples~/DemoCartuja"
+    }
+  ]
+}

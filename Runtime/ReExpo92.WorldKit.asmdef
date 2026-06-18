@@ -1,0 +1,14 @@
+{
+  "name": "ReExpo92.WorldKit",
+  "rootNamespace": "ReExpo92.WorldKit",
+  "references": [],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}
