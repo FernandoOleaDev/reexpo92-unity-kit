@@ -3,6 +3,17 @@ using Newtonsoft.Json.Linq;
 
 namespace ReExpo92.WorldKit
 {
+    /// <summary>Una re-memoria del catálogo (para listarlas y descargarlas).</summary>
+    public class ReMemoryItem
+    {
+        public string Id;
+        public string Name;
+        public string Status;
+        public string Category;
+        public string Description;
+        public string ImageUrl;
+    }
+
     /// <summary>Punto de interés (re-memoria situada en el mapa).</summary>
     public class MapPoi
     {

@@ -2,7 +2,8 @@
   "name": "ReExpo92.WorldKit.Editor",
   "rootNamespace": "ReExpo92.WorldKit.Editor",
   "references": [
-    "ReExpo92.WorldKit"
+    "ReExpo92.WorldKit",
+    "Unity.TextMeshPro"
   ],
   "includePlatforms": [
     "Editor"

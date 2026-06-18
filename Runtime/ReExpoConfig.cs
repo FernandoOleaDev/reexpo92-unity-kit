@@ -24,6 +24,13 @@ namespace ReExpo92.WorldKit
         /// Altura por defecto (m) del origen y de los marcadores sobre el terreno.
         public const double DefaultHeight = 5.0;
 
+        /// Altura ELIPSOIDAL (m, WGS84) del suelo de la Cartuja. En Sevilla el
+        /// geoide está ~49 m sobre el elipsoide y el terreno está a ~7 m, así que
+        /// el suelo cae a ~56 m elipsoidales. Los POIs/zonas se colocan aquí para
+        /// que queden a ras de suelo (si no, se hunden ~50 m). Afinable o, mejor,
+        /// se puede muestrear el terreno real con Cesium SampleHeightMostDetailed.
+        public const double GroundHeightMeters = 56.0;
+
         // ----- Entrega de la clave de Google -----
         /// Passphrase de la ofuscación XOR+base64 (anti-casual, NO es seguridad).
         /// Debe coincidir con la función _obfuscate del backend.
@@ -35,5 +42,14 @@ namespace ReExpo92.WorldKit
 
         /// Nombre de la skill que autoriza a descargar la clave de Google.
         public const string UnityDevSkill = "unity_dev";
+
+        // ----- Límite de carga de la maqueta (rendimiento + foco) -----
+        // Caja (en metros, centrada en el origen del recinto) fuera de la cual NO
+        // se cargan tiles de Google. Cubre la Isla de la Cartuja + alrededores.
+        public const float WorldBoxSizeMeters = 6000f;   // ~3 km a cada lado
+        public const float WorldBoxHeightMeters = 6000f; // margen vertical amplio
+
+        /// Altura (m) de los volúmenes semitransparentes de las zonas.
+        public const float ZoneHeightMeters = 37.5f;
     }
 }

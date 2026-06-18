@@ -278,5 +278,59 @@ namespace ReExpo92.WorldKit.Editor
             l.text = text;
             l.style.color = kind == "ok" ? Green : kind == "err" ? Red : kind == "busy" ? Blue2 : Ink;
         }
+
+        // ---- chip de estado/tipo ----
+        public static Label Chip(string text, string kind)
+        {
+            var l = new Label(text);
+            l.style.fontSize = 10; l.style.unityFontStyleAndWeight = FontStyle.Bold;
+            Pad(l, 1, 6); l.style.marginRight = 4; l.style.marginTop = 1; Square(l);
+            Color bg, fg;
+            switch (kind)
+            {
+                case "ok": bg = new Color(0.78f, 0.92f, 0.80f); fg = new Color(0.10f, 0.40f, 0.20f); break;
+                case "warn": bg = new Color(1f, 0.93f, 0.70f); fg = new Color(0.50f, 0.36f, 0f); break;
+                case "type": bg = new Color(0.85f, 0.87f, 0.97f); fg = Blue; break;
+                default: bg = new Color(0.82f, 0.82f, 0.82f); fg = new Color(0.30f, 0.30f, 0.30f); break;
+            }
+            l.style.backgroundColor = bg; l.style.color = fg;
+            l.style.borderTopWidth = 1; l.style.borderLeftWidth = 1; l.style.borderRightWidth = 1; l.style.borderBottomWidth = 1;
+            l.style.borderTopColor = l.style.borderLeftColor = l.style.borderRightColor = l.style.borderBottomColor = new Color(0, 0, 0, 0.15f);
+            return l;
+        }
+
+        // ---- botón de toolbar (con estado activo hundido) ----
+        public static Button ToolButton(string text, Action onClick, bool active = false)
+        {
+            var b = new Button(onClick) { text = text };
+            b.style.unityFontStyleAndWeight = FontStyle.Bold; b.style.fontSize = 11;
+            Pad(b, 4, 8); b.style.marginRight = 3; b.style.marginTop = 0; Square(b);
+            b.style.borderTopWidth = 2; b.style.borderLeftWidth = 2; b.style.borderRightWidth = 2; b.style.borderBottomWidth = 2;
+            if (active)
+            {
+                b.style.backgroundColor = new Color(0.71f, 0.78f, 0.95f); b.style.color = Blue;
+                b.style.borderTopColor = Dark; b.style.borderLeftColor = Dark; b.style.borderRightColor = Light; b.style.borderBottomColor = Light;
+            }
+            else
+            {
+                b.style.backgroundColor = Grey; b.style.color = Color.black;
+                b.style.borderTopColor = Light; b.style.borderLeftColor = Light; b.style.borderRightColor = Dark; b.style.borderBottomColor = Dark;
+            }
+            return b;
+        }
+
+        // ---- pestaña ----
+        public static Button Tab(string text, Action onClick, bool active)
+        {
+            var b = new Button(onClick) { text = text };
+            b.style.unityFontStyleAndWeight = FontStyle.Bold; b.style.fontSize = 12;
+            Pad(b, 5, 12); b.style.marginRight = 2; b.style.marginTop = 0; Square(b);
+            b.style.borderTopWidth = 2; b.style.borderLeftWidth = 2; b.style.borderRightWidth = 2;
+            b.style.borderBottomWidth = active ? 0 : 2;
+            b.style.borderTopColor = Light; b.style.borderLeftColor = Light; b.style.borderRightColor = Dark; b.style.borderBottomColor = Dark;
+            b.style.backgroundColor = active ? Paper : Grey;
+            b.style.color = active ? Blue : Color.black;
+            return b;
+        }
     }
 }

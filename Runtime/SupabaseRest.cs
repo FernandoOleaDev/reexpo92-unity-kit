@@ -140,5 +140,19 @@ namespace ReExpo92.WorldKit
                 return (req.downloadHandler.text, null);
             }
         }
+
+        // ---- REST GET ----
+        /// GET a /rest/v1 (p. ej. "/re_memories?select=..."). Devuelve JSON o error.
+        public static async Task<(string json, string error)> RestGet(string pathAndQuery, string bearer)
+        {
+            using (var req = UnityWebRequest.Get(Rest + pathAndQuery))
+            {
+                req.SetRequestHeader("apikey", ReExpoConfig.SupabaseAnonKey);
+                req.SetRequestHeader("Authorization", "Bearer " + (bearer ?? ReExpoConfig.SupabaseAnonKey));
+                await SendAsync(req);
+                if (!Ok(req)) return (null, ErrorText(req));
+                return (req.downloadHandler.text, null);
+            }
+        }
     }
 }

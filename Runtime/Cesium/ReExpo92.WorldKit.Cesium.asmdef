@@ -3,7 +3,9 @@
   "rootNamespace": "ReExpo92.WorldKit.Cesium",
   "references": [
     "ReExpo92.WorldKit",
-    "CesiumForUnity"
+    "CesiumForUnity",
+    "Unity.Mathematics",
+    "Unity.TextMeshPro"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],

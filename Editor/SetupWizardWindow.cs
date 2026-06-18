@@ -128,6 +128,19 @@ namespace ReExpo92.WorldKit.Editor
             {
                 c.Add(ReExpoUI.Note("Todo listo para la maqueta 3D."));
             }
+
+            bool tmp = ReExpoTMPSetup.EssentialsPresent();
+            c.Add(ReExpoUI.Check(tmp, tmp ? "TextMeshPro listo (carteles)" : "TextMeshPro: faltan recursos (los carteles no se ven)"));
+            if (!tmp)
+                c.Add(ReExpoUI.Primary("Instalar recursos de TextMeshPro", InstallTMP, "⬇"));
+        }
+
+        void InstallTMP()
+        {
+            if (ReExpoTMPSetup.EnsureEssentials())
+                Status("ok", "Importando recursos de TextMeshPro… Unity los añade y recompila. Reconstruye el mundo al acabar.");
+            else
+                Status("err", "No pude importar TMP. Hazlo a mano: Window ▸ TextMeshPro ▸ Import TMP Essential Resources.");
         }
 
         void InstallCesium()

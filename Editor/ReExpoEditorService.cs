@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Security.Cryptography;
@@ -38,6 +39,7 @@ namespace ReExpo92.WorldKit.Editor
         /// Restaura la sesión guardada (llamar al cargar el editor / abrir ventana).
         public static void Restore()
         {
+            ReExpoClient.OnSessionRefreshed = Persist; // guarda el token al refrescarse
             var access = EditorPrefs.GetString(KAccess, null);
             if (string.IsNullOrEmpty(access)) return;
             ReExpoClient.Session = new AuthSession
@@ -141,6 +143,18 @@ namespace ReExpo92.WorldKit.Editor
             var (data, ed) = await ReExpoClient.FetchMapData();
             if (ed != null) return "Datos del mapa: " + ed;
 
+            // Sustituye el rig anterior SIN perder tu trabajo: si existe y solo
+            // contiene lo generado (tiles/POIs/zonas) lo borra; si tiene objetos
+            // tuyos dentro, aborta y avisa (no los destruye).
+            var old = GameObject.Find("ReExpo92 Rig");
+            if (old != null)
+            {
+                if (RigHasUserObjects(old))
+                    return "El «ReExpo92 Rig» actual tiene objetos tuyos dentro; NO lo borro para no perderlos. " +
+                           "Sácalos del rig (o bórralo a mano) y vuelve a construir.";
+                Undo.DestroyObjectImmediate(old);
+            }
+
             var go = builder.Build(new WorldBuildOptions
             {
                 GoogleApiKey = apiKey,
@@ -154,6 +168,18 @@ namespace ReExpo92.WorldKit.Editor
             EditorSceneManager.MarkSceneDirty(go.scene);
             int pc = data?.Pois?.Count ?? 0, zc = data?.Zones?.Count ?? 0;
             return $"OK · {pc} POIs y {zc} zonas. {(apiKey != null ? "Maqueta de Google activa." : "Sin maqueta de Google.")}";
+        }
+
+        // ---- sustitución segura del rig ----
+        static readonly HashSet<string> RigGenerated =
+            new HashSet<string> { "Google Photorealistic 3D Tiles", "POIs", "Zonas" };
+
+        /// ¿El rig tiene hijos directos que NO sean lo generado? (= trabajo del usuario)
+        static bool RigHasUserObjects(GameObject rig)
+        {
+            foreach (Transform child in rig.transform)
+                if (!RigGenerated.Contains(child.name)) return true;
+            return false;
         }
 
         // ---- instalar Cesium for Unity automáticamente ----

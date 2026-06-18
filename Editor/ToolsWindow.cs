@@ -1,0 +1,473 @@
+using System.Collections.Generic;
+using System.Linq;
+using UnityEditor;
+using UnityEditor.UIElements;
+using UnityEngine;
+using UnityEngine.Networking;
+using UnityEngine.UIElements;
+
+namespace ReExpo92.WorldKit.Editor
+{
+    /// <summary>
+    /// Ventana-herramienta principal de re-Expo92 (la que queda abierta).
+    /// Toolbar NATIVA (botones de Unity, fiables) para capas + pestañas:
+    ///   • Re-memorias — listado con miniatura, título y resumen; filtro por tipo.
+    ///   • Configuración — activar/desactivar el límite de carga a la Cartuja.
+    ///   • Ayuda — qué es y qué viene (descarga/aportaciones en desarrollo).
+    /// </summary>
+    public class ToolsWindow : EditorWindow
+    {
+        static readonly Color Ink = new Color(0.102f, 0.090f, 0.078f);
+        static readonly Color RowAlt = new Color(0f, 0f, 0f, 0.04f);
+        static readonly Color Line = new Color(0f, 0f, 0f, 0.12f);
+        static readonly Color ThumbBg = new Color(0.80f, 0.80f, 0.80f);
+
+        static readonly string[] TabNames = { "Re-memorias", "Configuración", "Ayuda" };
+        [SerializeField] int _tab;
+        bool _wire;
+
+        List<ReMemoryItem> _items;
+        List<ReMemoryItem> _filtered = new List<ReMemoryItem>();
+        string _loadError;
+        bool _loading;
+        string _typeFilter = "Todos";
+        string _search = "";
+
+        Label _status;
+        ListView _list;
+        static readonly Dictionary<string, Texture2D> _texCache = new Dictionary<string, Texture2D>();
+
+        [MenuItem("re-Expo92/Herramientas", false, 2)]
+        public static void Open()
+        {
+            var w = GetWindow<ToolsWindow>();
+            w.titleContent = new GUIContent("re-Expo92 Tools", ReExpoUI.LoadLogo());
+            w.minSize = new Vector2(500, 560);
+            ReExpoEditorService.Restore();
+        }
+
+        public void CreateGUI()
+        {
+            ReExpoEditorService.Restore();
+            Rebuild();
+            if (_items == null) LoadItems();
+        }
+
+        void Rebuild()
+        {
+            var root = rootVisualElement;
+            root.Clear();
+            ReExpoUI.ApplyStyle(root);
+            root.Add(ReExpoUI.Header("Herramientas del recinto"));
+            root.Add(Toolbar());
+            root.Add(TabStrip());
+
+            var body = ReExpoUI.Body();
+            body.style.paddingTop = 8;
+            root.Add(body);
+
+            switch (_tab)
+            {
+                case 0: RenderRememorias(body); break;
+                case 1: RenderConfig(body); break;
+                case 2: RenderAyuda(body); break;
+            }
+
+            _status = ReExpoUI.Feedback();
+            root.Add(_status);
+        }
+
+        // ---------- toolbar nativa ----------
+        VisualElement Toolbar()
+        {
+            var tb = new Toolbar();
+            tb.Add(LayerToggle("📌 POIs", "POIs"));
+            tb.Add(LayerToggle("▰ Zonas", "Zonas"));
+            tb.Add(LayerToggle("🌍 Tiles", "Google Photorealistic 3D Tiles"));
+            tb.Add(new ToolbarSpacer());
+            var wf = new ToolbarToggle { text = "▦ Wireframe", value = _wire };
+            wf.RegisterValueChangedCallback(e => SetWire(e.newValue));
+            tb.Add(wf);
+            tb.Add(new ToolbarSpacer());
+            tb.Add(new ToolbarButton(Recenter) { text = "🎯 Recentrar" });
+            tb.Add(new ToolbarButton(LoadItems) { text = "🔄 Refrescar" });
+            return tb;
+        }
+
+        ToolbarToggle LayerToggle(string label, string child)
+        {
+            var t = new ToolbarToggle { text = label, value = LayerActive(child) };
+            t.RegisterValueChangedCallback(e => SetLayer(child, e.newValue));
+            return t;
+        }
+
+        // ---------- tira de pestañas (toggles nativos) ----------
+        VisualElement TabStrip()
+        {
+            var tb = new Toolbar();
+            for (int i = 0; i < TabNames.Length; i++)
+            {
+                int idx = i;
+                var t = new ToolbarToggle { text = TabNames[i], value = i == _tab };
+                t.style.unityFontStyleAndWeight = FontStyle.Bold;
+                t.RegisterValueChangedCallback(e => { if (e.newValue) { _tab = idx; Rebuild(); } });
+                tb.Add(t);
+            }
+            return tb;
+        }
+
+        // ---------- pestaña Re-memorias ----------
+        void RenderRememorias(VisualElement c)
+        {
+            var filters = ReExpoUI.Row();
+            filters.style.alignItems = Align.Center; filters.style.marginBottom = 6; filters.style.flexWrap = Wrap.Wrap;
+
+            var choices = TypeChoices();
+            var dd = new DropdownField("Tipo", choices, Mathf.Max(0, choices.IndexOf(_typeFilter)));
+            dd.style.minWidth = 240; dd.style.marginRight = 8; StyleDropdown(dd);
+            dd.RegisterValueChangedCallback(e => { _typeFilter = e.newValue; ApplyFilter(); });
+            filters.Add(dd);
+
+            var search = ReExpoUI.Field("Buscar");
+            search.value = _search; search.style.flexGrow = 1; search.style.minWidth = 160;
+            search.RegisterValueChangedCallback(e => { _search = e.newValue; ApplyFilter(); });
+            filters.Add(search);
+            c.Add(filters);
+
+            var count = new Label(); count.name = "count"; count.style.color = Ink; count.style.fontSize = 11; count.style.marginBottom = 4;
+            c.Add(count);
+
+            _list = new ListView
+            {
+                fixedItemHeight = 74,
+                selectionType = SelectionType.None,
+                makeItem = MakeRow,
+                bindItem = BindRow,
+                itemsSource = _filtered,
+            };
+            _list.style.flexGrow = 1;
+            _list.style.backgroundColor = Color.white;
+            _list.style.borderTopWidth = 1; _list.style.borderLeftWidth = 1; _list.style.borderRightWidth = 1; _list.style.borderBottomWidth = 1;
+            _list.style.borderTopColor = _list.style.borderLeftColor = _list.style.borderRightColor = _list.style.borderBottomColor = new Color(0.5f, 0.5f, 0.5f);
+            c.Add(_list);
+
+            ApplyFilter();
+        }
+
+        VisualElement MakeRow()
+        {
+            var r = new VisualElement();
+            r.style.flexDirection = FlexDirection.Row; r.style.alignItems = Align.Center;
+            r.style.height = 74; r.style.overflow = Overflow.Hidden;
+            r.style.paddingTop = 6; r.style.paddingBottom = 6; r.style.paddingLeft = 8; r.style.paddingRight = 8;
+            r.style.borderBottomWidth = 1; r.style.borderBottomColor = Line;
+
+            var img = new Image { name = "thumb", scaleMode = ScaleMode.ScaleAndCrop };
+            img.style.width = 58; img.style.height = 58; img.style.marginRight = 10; img.style.flexShrink = 0;
+            img.style.backgroundColor = ThumbBg;
+            img.style.borderTopWidth = 1; img.style.borderLeftWidth = 1; img.style.borderRightWidth = 1; img.style.borderBottomWidth = 1;
+            img.style.borderTopColor = img.style.borderLeftColor = img.style.borderRightColor = img.style.borderBottomColor = new Color(0, 0, 0, 0.18f);
+            r.Add(img);
+
+            // columna de texto (minWidth 0 = permite elipsis al encoger)
+            var col = new VisualElement(); col.style.flexGrow = 1; col.style.flexShrink = 1; col.style.minWidth = 0; col.style.overflow = Overflow.Hidden;
+
+            var title = new Label { name = "title" };
+            title.style.color = Ink; title.style.unityFontStyleAndWeight = FontStyle.Bold; title.style.fontSize = 12;
+            title.style.whiteSpace = WhiteSpace.NoWrap; title.style.overflow = Overflow.Hidden; title.style.textOverflow = TextOverflow.Ellipsis;
+
+            var chips = new VisualElement { name = "chips" }; chips.style.flexDirection = FlexDirection.Row; chips.style.marginTop = 2; chips.style.marginBottom = 2; chips.style.overflow = Overflow.Hidden;
+
+            var summary = new Label { name = "summary" };
+            summary.style.color = new Color(0.34f, 0.31f, 0.27f); summary.style.fontSize = 10;
+            summary.style.whiteSpace = WhiteSpace.NoWrap; summary.style.overflow = Overflow.Hidden; summary.style.textOverflow = TextOverflow.Ellipsis;
+
+            col.Add(title); col.Add(chips); col.Add(summary);
+            r.Add(col);
+
+            var dl = new Button { name = "dl", text = "⬇" };
+            dl.style.flexShrink = 0; dl.style.marginLeft = 6; dl.style.width = 30; dl.style.height = 26;
+            dl.tooltip = "Descargar el contenido Unity de esta re-memoria (próximamente)";
+            dl.clicked += () => { if (r.userData is ReMemoryItem it) Status("busy", "Descargar «" + it.Name + "»: PRÓXIMAMENTE (Addressables)."); };
+            r.Add(dl);
+            return r;
+        }
+
+        void BindRow(VisualElement r, int i)
+        {
+            if (i < 0 || i >= _filtered.Count) return;
+            var it = _filtered[i];
+            r.userData = it;
+            r.style.backgroundColor = (i % 2 == 0) ? Color.white : RowAlt;
+            r.Q<Label>("title").text = string.IsNullOrEmpty(it.Name) ? "(sin nombre)" : it.Name;
+            r.Q<Label>("summary").text = ShortDesc(it.Description);
+
+            var chips = r.Q("chips"); chips.Clear();
+            chips.Add(ReExpoUI.Chip(it.Category ?? "—", "type"));
+            chips.Add(ReExpoUI.Chip(StatusLabel(it.Status), StatusKind(it.Status)));
+
+            var img = r.Q<Image>("thumb"); img.image = null;
+            LoadThumb(img, it.ImageUrl);
+        }
+
+        void ApplyFilter()
+        {
+            _filtered = Filtered();
+            if (_list != null) { _list.itemsSource = _filtered; _list.Rebuild(); }
+            var count = rootVisualElement.Q<Label>("count");
+            if (count != null)
+                count.text = _loading ? "Cargando…"
+                    : _loadError != null ? "Error: " + _loadError
+                    : $"{_filtered.Count} re-memoria(s)";
+        }
+
+        static void LoadThumb(Image img, string url)
+        {
+            if (img == null || string.IsNullOrEmpty(url)) return;
+            if (_texCache.TryGetValue(url, out var cached)) { img.image = cached; return; }
+            var req = UnityWebRequestTexture.GetTexture(url);
+            var op = req.SendWebRequest();
+            op.completed += _ =>
+            {
+                if (req.result == UnityWebRequest.Result.Success)
+                {
+                    var tex = DownloadHandlerTexture.GetContent(req);
+                    if (tex != null) { _texCache[url] = tex; img.image = tex; }
+                }
+                req.Dispose();
+            };
+        }
+
+        // ---------- pestaña Configuración ----------
+        void RenderConfig(VisualElement c)
+        {
+            var card = ReExpoUI.Card();
+            card.Add(ReExpoUI.SectionTitle("Carga de la maqueta"));
+            var t = ReExpoUI.Toggle("Limitar la carga a la Cartuja + alrededores (recomendado)", BoundsEnabled());
+            t.RegisterValueChangedCallback(e => SetBounds(e.newValue));
+            card.Add(t);
+            card.Add(ReExpoUI.Note(
+                "Con el límite activo, Google solo carga los tiles de la zona de la Expo (mejor rendimiento). " +
+                "Desactívalo si necesitas navegar fuera del recinto. El cambio se aplica al momento."));
+            c.Add(card);
+
+            var cardL = ReExpoUI.Card();
+            cardL.Add(ReExpoUI.SectionTitle("POIs y carteles"));
+            var tl = ReExpoUI.Toggle("Mostrar carteles (nombre) sobre cada POI", ReExpoLabels.Enabled);
+            tl.RegisterValueChangedCallback(e => ReExpoLabels.Enabled = e.newValue);
+            cardL.Add(tl);
+
+            var ballRot = new UnityEngine.UIElements.Vector3Field("Rotación bola (XYZ)") { value = ReExpoLabels.BallRotOffset };
+            StyleFieldLabel(ballRot);
+            ballRot.RegisterValueChangedCallback(e => ReExpoLabels.BallRotOffset = e.newValue);
+            cardL.Add(ballRot);
+
+            var labRot = new UnityEngine.UIElements.Vector3Field("Rotación cartel (XYZ)") { value = ReExpoLabels.LabelRotOffset };
+            StyleFieldLabel(labRot);
+            labRot.RegisterValueChangedCallback(e => ReExpoLabels.LabelRotOffset = e.newValue);
+            cardL.Add(labRot);
+
+            var labPos = new UnityEngine.UIElements.Vector3Field("Posición cartel (der/arriba/fondo)") { value = ReExpoLabels.LabelPosOffset };
+            StyleFieldLabel(labPos);
+            labPos.RegisterValueChangedCallback(e => ReExpoLabels.LabelPosOffset = e.newValue);
+            cardL.Add(labPos);
+
+            var labFont = new UnityEngine.UIElements.FloatField("Tamaño de letra (TMP)") { value = ReExpoLabels.LabelFontSize };
+            StyleFieldLabel(labFont);
+            labFont.RegisterValueChangedCallback(e => ReExpoLabels.LabelFontSize = e.newValue);
+            cardL.Add(labFont);
+
+            var labMax = new UnityEngine.UIElements.FloatField("Tamaño máximo cartel (escala)") { value = ReExpoLabels.LabelMaxSize };
+            StyleFieldLabel(labMax);
+            labMax.RegisterValueChangedCallback(e => ReExpoLabels.LabelMaxSize = e.newValue);
+            cardL.Add(labMax);
+
+            // Un solo control de rango con dos pomos: cerca (mín) y lejos (máx).
+            var radios = new UnityEngine.UIElements.MinMaxSlider("Radios cerca–lejos (m)", ReExpoLabels.NearRadius, ReExpoLabels.FarRadius, 5f, 4000f);
+            StyleFieldLabel(radios);
+            var radiosVal = new Label($"cerca {ReExpoLabels.NearRadius:0}  ·  lejos {ReExpoLabels.FarRadius:0} m");
+            radiosVal.style.color = Ink; radiosVal.style.fontSize = 10; radiosVal.style.marginTop = 1; radiosVal.style.marginBottom = 4;
+            radios.RegisterValueChangedCallback(e =>
+            {
+                ReExpoLabels.NearRadius = e.newValue.x;
+                ReExpoLabels.FarRadius = e.newValue.y;
+                radiosVal.text = $"cerca {e.newValue.x:0}  ·  lejos {e.newValue.y:0} m";
+            });
+            cardL.Add(radios);
+            cardL.Add(radiosVal);
+
+            cardL.Add(ReExpoUI.Note("Más cerca del «radio cercano» → tamaño máximo; más lejos del «radio lejano» → desaparece; en medio, escala. El lejano siempre se fuerza mayor que el cercano. Posición del cartel en ejes de cámara (x=derecha, y=arriba, z=al fondo)."));
+            c.Add(cardL);
+
+            var card2 = ReExpoUI.Card();
+            card2.Add(ReExpoUI.SectionTitle("Escena"));
+            card2.Add(ReExpoUI.Secondary("🎯 Recentrar en el recinto", Recenter, null));
+            card2.Add(ReExpoUI.Note("¿POIs/zonas a una altura rara? Reconstruye el mundo desde el Panel de control (se colocan a ras de suelo de la Cartuja)."));
+            c.Add(card2);
+        }
+
+        // ---------- pestaña Ayuda ----------
+        void RenderAyuda(VisualElement c)
+        {
+            var card = ReExpoUI.Card();
+            card.Add(ReExpoUI.SectionTitle("Qué es esta ventana"));
+            card.Add(ReExpoUI.Para(
+                "Tu mesa de trabajo para reconstruir la Expo 92. Arriba, las capas (POIs, zonas, maqueta de Google) " +
+                "y herramientas de vista. En «Re-memorias», el catálogo de piezas a recrear."));
+            c.Add(card);
+
+            var card2 = ReExpoUI.Card();
+            card2.Add(ReExpoUI.SectionTitle("En desarrollo"));
+            card2.Add(ReExpoUI.Para(
+                "Pronto podrás DESCARGAR el contenido Unity de cada re-memoria (su recreación validada) y APORTAR " +
+                "añadidos: modelos 3D, animaciones, partículas o partes sueltas. Los modeladores podrán subir GLB directamente."));
+            card2.Add(ReExpoUI.Warn(
+                "Esta parte (Addressables + flujo de revisión) está por definir a fondo. De momento, los botones ⬇/➕ son un anticipo."));
+            c.Add(card2);
+        }
+
+        // ---------- acciones de capas / escena ----------
+        static GameObject Rig() => GameObject.Find("ReExpo92 Rig");
+
+        bool LayerActive(string child)
+        {
+            var rig = Rig(); if (rig == null) return false;
+            var t = rig.transform.Find(child);
+            return t != null && t.gameObject.activeSelf;
+        }
+
+        void SetLayer(string child, bool on)
+        {
+            var rig = Rig();
+            if (rig == null) { Status("err", "No hay «ReExpo92 Rig». Constrúyelo desde el Panel de control."); return; }
+            var t = rig.transform.Find(child);
+            if (t == null) { Status("err", "Capa no encontrada: " + child); return; }
+            t.gameObject.SetActive(on);
+            Status("ok", child + (on ? " · visible" : " · oculta"));
+        }
+
+        void SetWire(bool on)
+        {
+            var sv = SceneView.lastActiveSceneView;
+            if (sv == null) { Status("err", "Abre una ventana Scene primero."); return; }
+            _wire = on;
+            sv.cameraMode = SceneView.GetBuiltinCameraMode(on ? DrawCameraMode.Wireframe : DrawCameraMode.Textured);
+            sv.Repaint();
+        }
+
+        void Recenter()
+        {
+            var rig = Rig();
+            if (rig == null) { Status("err", "No hay «ReExpo92 Rig». Constrúyelo primero (Panel de control)."); return; }
+            Selection.activeGameObject = rig;
+            if (SceneView.lastActiveSceneView != null) SceneView.lastActiveSceneView.FrameSelected();
+        }
+
+        // límite de área (excluder), sin referenciar el tipo Cesium
+        Behaviour Excluder()
+        {
+            var rig = Rig(); if (rig == null) return null;
+            var tiles = rig.transform.Find("Google Photorealistic 3D Tiles");
+            if (tiles == null) return null;
+            return tiles.GetComponent("ReExpoBoxExcluder") as Behaviour;
+        }
+        bool BoundsEnabled() { var e = Excluder(); return e == null || e.enabled; }
+        void SetBounds(bool on)
+        {
+            var e = Excluder();
+            if (e == null) { Status("err", "No hay maqueta/límite en la escena. Reconstruye el mundo."); return; }
+            e.enabled = on;
+            Status("ok", on ? "Carga limitada a la Cartuja." : "Límite desactivado: se cargará todo el mundo.");
+        }
+
+        // ---------- datos ----------
+        async void LoadItems()
+        {
+            _loading = true; _loadError = null;
+            ApplyFilter();
+            var (items, err) = await ReExpoClient.FetchReMemories();
+            _loading = false;
+            if (err != null) { _loadError = err; _items = new List<ReMemoryItem>(); }
+            else { _items = items ?? new List<ReMemoryItem>(); _loadError = null; }
+            if (_tab == 0) Rebuild();
+        }
+
+        List<ReMemoryItem> Filtered()
+        {
+            if (_items == null) return new List<ReMemoryItem>();
+            IEnumerable<ReMemoryItem> q = _items;
+            if (_typeFilter != "Todos") q = q.Where(i => i.Category == _typeFilter);
+            if (!string.IsNullOrWhiteSpace(_search))
+            {
+                var s = _search.Trim().ToLowerInvariant();
+                q = q.Where(i => (i.Name ?? "").ToLowerInvariant().Contains(s));
+            }
+            return q.ToList();
+        }
+
+        List<string> TypeChoices()
+        {
+            var cats = (_items ?? new List<ReMemoryItem>())
+                .Select(i => i.Category).Where(c => !string.IsNullOrEmpty(c) && c != "—").Distinct().ToList();
+            cats.Sort((a, b) =>
+            {
+                bool pa = a.ToLowerInvariant().Contains("abell"), pb = b.ToLowerInvariant().Contains("abell");
+                if (pa != pb) return pa ? -1 : 1;
+                return string.Compare(a, b, System.StringComparison.OrdinalIgnoreCase);
+            });
+            var list = new List<string> { "Todos" };
+            list.AddRange(cats);
+            return list;
+        }
+
+        // ---------- helpers ----------
+        static string ShortDesc(string d)
+        {
+            if (string.IsNullOrWhiteSpace(d)) return "";
+            d = d.Replace("\n", " ").Trim();
+            return d.Length > 140 ? d.Substring(0, 140) + "…" : d;
+        }
+        static string StatusLabel(string s)
+        {
+            switch (s)
+            {
+                case "validado": return "VALIDADO";
+                case "seleccionado": return "OFICIAL";
+                case "completo": return "COMPLETO";
+                case "en_progreso": return "EN PROGRESO";
+                default: return string.IsNullOrEmpty(s) ? "—" : s.ToUpperInvariant();
+            }
+        }
+        static string StatusKind(string s)
+        {
+            switch (s)
+            {
+                case "validado": case "seleccionado": return "ok";
+                case "completo": case "en_progreso": return "warn";
+                default: return "muted";
+            }
+        }
+        static void StyleSliderLabel(Slider s)
+        {
+            var lbl = s.Q<Label>();
+            if (lbl != null) { lbl.style.color = Ink; lbl.style.minWidth = 120; }
+        }
+
+        static void StyleFieldLabel(VisualElement field)
+        {
+            var lbl = field.Q<Label>();
+            if (lbl != null) { lbl.style.color = Ink; lbl.style.minWidth = 150; }
+        }
+
+        static void StyleDropdown(DropdownField dd)
+        {
+            var lbl = dd.Q<Label>(); if (lbl != null) { lbl.style.color = Ink; lbl.style.minWidth = 40; }
+            foreach (var cn in new[] { "unity-base-popup-field__input", "unity-popup-field__input", "unity-base-dropdown__input" })
+            {
+                var el = dd.Q(className: cn);
+                if (el != null) { el.style.backgroundColor = Color.white; el.style.color = Color.black; }
+            }
+        }
+        void Status(string kind, string text) => ReExpoUI.SetFeedback(_status, kind, text);
+    }
+}
