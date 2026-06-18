@@ -17,9 +17,9 @@ sobre el recinto.
 
 - **Unity 6.3 LTS — `6000.3.17f1`** (versión fijada del proyecto).
 - **Render pipeline: URP.**
-- **Cesium for Unity** (`com.cesium.unity`, v1.23.x) — instálalo desde el
-  instalador/tarball oficial de Cesium. Sin él, el package compila pero no puede
-  montar la maqueta 3D.
+- **Cesium for Unity** (`com.cesium.unity`, v1.23.x) — instálalo por su *scoped
+  registry* (ver Instalación). Sin él, el package compila pero no puede montar la
+  maqueta 3D.
 - **Newtonsoft Json** (`com.unity.nuget.newtonsoft-json`) — se resuelve solo como
   dependencia.
 - Una **cuenta de colaborador de re-Expo92** y el **perfil de desarrollador
@@ -27,10 +27,13 @@ sobre el recinto.
 
 ## Instalación
 
-1. Instala **Cesium for Unity** en tu proyecto.
-2. Añade este package por **Package Manager ▸ Add package from git URL**:
+1. **Cesium for Unity** ([quickstart oficial](https://cesium.com/learn/unity/unity-quickstart/)):
+   `Edit ▸ Project Settings ▸ Package Manager` → añade un Scoped Registry — Name
+   `Cesium`, URL `https://unity.pkg.cesium.com`, Scope `com.cesium.unity` → Save.
+   Luego `Window ▸ Package Manager ▸ My Registries ▸ Cesium for Unity ▸ Install`.
+   (No hace falta cuenta de Cesium ion: usamos la clave de Google directa.)
+2. Añade este package por **Package Manager ▸ + ▸ Add package from git URL**:
    `https://github.com/FernandoOleaDev/reexpo92-unity-kit.git`
-   (o como submódulo / tarball, según tu flujo).
 3. Al primer arranque se abre el **Asistente de configuración**
    (`Tools ▸ re-Expo92 ▸ Asistente de configuración`).
 
