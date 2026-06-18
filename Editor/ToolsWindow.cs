@@ -66,14 +66,26 @@ namespace ReExpo92.WorldKit.Editor
             body.style.paddingTop = 8;
             root.Add(body);
 
-            switch (_tab)
+            if (_tab == 0)
             {
-                case 0: RenderRememorias(body); break;
-                case 1: RenderConfig(body); break;
-                case 2: RenderAyuda(body); break;
+                // Re-memorias gestiona su propio scroll (ListView virtualizado).
+                RenderRememorias(body);
+            }
+            else
+            {
+                // Configuración/Ayuda: scroll vertical para que nada quede cortado.
+                var scroll = new ScrollView(ScrollViewMode.Vertical);
+                scroll.style.flexGrow = 1;
+                scroll.horizontalScrollerVisibility = ScrollerVisibility.Hidden;
+                scroll.verticalScrollerVisibility = ScrollerVisibility.Auto;
+                scroll.contentContainer.style.paddingRight = 2; // aire junto a la barra
+                body.Add(scroll);
+                if (_tab == 1) RenderConfig(scroll.contentContainer);
+                else RenderAyuda(scroll.contentContainer);
             }
 
             _status = ReExpoUI.Feedback();
+            _status.style.marginLeft = 12; _status.style.marginRight = 12; _status.style.marginBottom = 6;
             root.Add(_status);
         }
 
@@ -185,8 +197,14 @@ namespace ReExpo92.WorldKit.Editor
             col.Add(title); col.Add(chips); col.Add(summary);
             r.Add(col);
 
+            var go = new Button { name = "go", text = "🎯" };
+            go.style.flexShrink = 0; go.style.marginLeft = 6; go.style.width = 30; go.style.height = 26;
+            go.tooltip = "Llevar la cámara de Scene a este POI";
+            go.clicked += () => { if (r.userData is ReMemoryItem it) GoToPoi(it); };
+            r.Add(go);
+
             var dl = new Button { name = "dl", text = "⬇" };
-            dl.style.flexShrink = 0; dl.style.marginLeft = 6; dl.style.width = 30; dl.style.height = 26;
+            dl.style.flexShrink = 0; dl.style.marginLeft = 4; dl.style.width = 30; dl.style.height = 26;
             dl.tooltip = "Descargar el contenido Unity de esta re-memoria (próximamente)";
             dl.clicked += () => { if (r.userData is ReMemoryItem it) Status("busy", "Descargar «" + it.Name + "»: PRÓXIMAMENTE (Addressables)."); };
             r.Add(dl);
@@ -208,6 +226,27 @@ namespace ReExpo92.WorldKit.Editor
 
             var img = r.Q<Image>("thumb"); img.image = null;
             LoadThumb(img, it.ImageUrl);
+
+            // el botón «ir al POI» solo si está colocado en la escena
+            var goBtn = r.Q<Button>("go");
+            if (goBtn != null) goBtn.SetEnabled(FindPoi(it.Name) != null);
+        }
+
+        static GameObject FindPoi(string name)
+        {
+            var rig = Rig(); if (rig == null) return null;
+            var poiRoot = rig.transform.Find("POIs"); if (poiRoot == null) return null;
+            var t = poiRoot.Find("POI · " + name);
+            return t != null ? t.gameObject : null;
+        }
+
+        void GoToPoi(ReMemoryItem it)
+        {
+            var poi = FindPoi(it.Name);
+            if (poi == null) { Status("err", "Ese POI no está colocado en el mapa."); return; }
+            Selection.activeGameObject = poi;
+            if (SceneView.lastActiveSceneView != null) SceneView.lastActiveSceneView.FrameSelected();
+            Status("ok", "Cámara movida a «" + it.Name + "».");
         }
 
         void ApplyFilter()
@@ -250,6 +289,23 @@ namespace ReExpo92.WorldKit.Editor
                 "Con el límite activo, Google solo carga los tiles de la zona de la Expo (mejor rendimiento). " +
                 "Desactívalo si necesitas navegar fuera del recinto. El cambio se aplica al momento."));
             c.Add(card);
+
+            var cardCat = ReExpoUI.Card();
+            cardCat.Add(ReExpoUI.SectionTitle("POIs por categoría"));
+            var allTog = ReExpoUI.Toggle("Mostrar TODAS las categorías", ReExpoPoiFilter.AllCategories);
+            allTog.RegisterValueChangedCallback(e => { ReExpoPoiFilter.AllCategories = e.newValue; Rebuild(); });
+            cardCat.Add(allTog);
+            if (!ReExpoPoiFilter.AllCategories)
+            {
+                foreach (var cat in TypeChoices().Skip(1))
+                {
+                    var ct = ReExpoUI.Toggle(cat, ReExpoPoiFilter.IsOn(cat));
+                    ct.RegisterValueChangedCallback(e => ReExpoPoiFilter.SetCategory(cat, e.newValue));
+                    cardCat.Add(ct);
+                }
+                cardCat.Add(ReExpoUI.Note("Solo se ven los POIs de las categorías marcadas (por defecto, solo Pabellones). Se aplica al momento."));
+            }
+            c.Add(cardCat);
 
             var cardL = ReExpoUI.Card();
             cardL.Add(ReExpoUI.SectionTitle("POIs y carteles"));
@@ -298,6 +354,39 @@ namespace ReExpo92.WorldKit.Editor
 
             cardL.Add(ReExpoUI.Note("Más cerca del «radio cercano» → tamaño máximo; más lejos del «radio lejano» → desaparece; en medio, escala. El lejano siempre se fuerza mayor que el cercano. Posición del cartel en ejes de cámara (x=derecha, y=arriba, z=al fondo)."));
             c.Add(cardL);
+
+            // ---- Cartel LED de zona (texto que gira por el perímetro) ----
+            var cardT = ReExpoUI.Card();
+            cardT.Add(ReExpoUI.SectionTitle("Zonas · cartel LED"));
+            var tT = ReExpoUI.Toggle("Mostrar el cartel LED girando por cada zona", ReExpoTicker.Enabled);
+            tT.RegisterValueChangedCallback(e => ReExpoTicker.Enabled = e.newValue);
+            cardT.Add(tT);
+
+            var tSpeed = new UnityEngine.UIElements.FloatField("Velocidad (m/s)") { value = ReExpoTicker.Speed };
+            StyleFieldLabel(tSpeed);
+            tSpeed.RegisterValueChangedCallback(e => ReExpoTicker.Speed = e.newValue);
+            cardT.Add(tSpeed);
+
+            var tLetter = new UnityEngine.UIElements.FloatField("Alto de letra (m)") { value = ReExpoTicker.LetterMeters };
+            StyleFieldLabel(tLetter);
+            tLetter.RegisterValueChangedCallback(e => ReExpoTicker.LetterMeters = e.newValue);
+            cardT.Add(tLetter);
+
+            var tHeight = new UnityEngine.UIElements.FloatField("Altura de la banda (m)") { value = ReExpoTicker.BandMeters };
+            StyleFieldLabel(tHeight);
+            tHeight.RegisterValueChangedCallback(e => ReExpoTicker.BandMeters = e.newValue);
+            cardT.Add(tHeight);
+
+            var tEmis = new UnityEngine.UIElements.Slider("Fuerza del emisivo (EV)", 0f, 8f) { value = ReExpoTicker.Intensity };
+            StyleFieldLabel(tEmis);
+            var tEmisVal = new Label($"{ReExpoTicker.Intensity:0.0} EV");
+            tEmisVal.style.color = Ink; tEmisVal.style.fontSize = 10; tEmisVal.style.marginTop = 1; tEmisVal.style.marginBottom = 4;
+            tEmis.RegisterValueChangedCallback(e => { ReExpoTicker.Intensity = e.newValue; tEmisVal.text = $"{e.newValue:0.0} EV"; });
+            cardT.Add(tEmis);
+            cardT.Add(tEmisVal);
+
+            cardT.Add(ReExpoUI.Note("Todo se aplica AL MOMENTO (no hace falta reconstruir). El COLOR de la letra es el de cada zona; la «fuerza del emisivo» lo realza en HDR (necesita Bloom en el Volume de URP para el halo)."));
+            c.Add(cardT);
 
             var card2 = ReExpoUI.Card();
             card2.Add(ReExpoUI.SectionTitle("Escena"));

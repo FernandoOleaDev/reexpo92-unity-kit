@@ -30,6 +30,8 @@ namespace ReExpo92.WorldKit
         void OnCam(ScriptableRenderContext ctx, Camera cam)
         {
             if (cam == null || transform.parent == null) return;
+            // solo Scene view y cámara de juego (evita previews = parpadeo)
+            if (cam.cameraType != CameraType.SceneView && cam.cameraType != CameraType.Game) return;
 
             var camT = cam.transform;
             Vector3 center = transform.parent.TransformPoint(ballCenterLocal);

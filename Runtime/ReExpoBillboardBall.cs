@@ -19,6 +19,8 @@ namespace ReExpo92.WorldKit
         void OnCam(ScriptableRenderContext ctx, Camera cam)
         {
             if (cam == null) return;
+            // solo Scene view y cámara de juego (evita previews del visor de materiales = parpadeo)
+            if (cam.cameraType != CameraType.SceneView && cam.cameraType != CameraType.Game) return;
             var camT = cam.transform;
             transform.rotation = Quaternion.LookRotation(transform.position - camT.position, camT.up)
                                * Quaternion.Euler(ReExpoLabelConfig.BallRotOffset);

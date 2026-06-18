@@ -133,6 +133,8 @@ namespace ReExpo92.WorldKit.Editor
         {
             var c = new VisualElement();
             c.style.backgroundColor = Paper; Bevel(c, false); Pad(c, 10, 12); c.style.marginBottom = 10;
+            c.style.width = Length.Percent(100);   // no se ensancha más que el panel
+            c.style.overflow = Overflow.Hidden;     // recorta hijos anchos (los campos no rompen la caja)
             return c;
         }
 

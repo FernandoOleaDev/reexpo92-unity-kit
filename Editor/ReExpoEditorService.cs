@@ -166,6 +166,7 @@ namespace ReExpo92.WorldKit.Editor
 
             Selection.activeGameObject = go;
             EditorSceneManager.MarkSceneDirty(go.scene);
+            ReExpoPoiFilter.Apply(); // aplica el filtro de categorías (por defecto, solo pabellones)
             int pc = data?.Pois?.Count ?? 0, zc = data?.Zones?.Count ?? 0;
             return $"OK · {pc} POIs y {zc} zonas. {(apiKey != null ? "Maqueta de Google activa." : "Sin maqueta de Google.")}";
         }
