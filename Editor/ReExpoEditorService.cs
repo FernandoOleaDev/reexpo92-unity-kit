@@ -1,9 +1,12 @@
 using System;
+using System.IO;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
+using Newtonsoft.Json.Linq;
 using UnityEditor;
+using UnityEditor.PackageManager;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 
@@ -151,6 +154,48 @@ namespace ReExpo92.WorldKit.Editor
             EditorSceneManager.MarkSceneDirty(go.scene);
             int pc = data?.Pois?.Count ?? 0, zc = data?.Zones?.Count ?? 0;
             return $"OK · {pc} POIs y {zc} zonas. {(apiKey != null ? "Maqueta de Google activa." : "Sin maqueta de Google.")}";
+        }
+
+        // ---- instalar Cesium for Unity automáticamente ----
+        /// <summary>
+        /// Añade el scoped registry de Cesium y la dependencia al manifest del
+        /// proyecto, y lanza la resolución de paquetes. Unity descarga Cesium y
+        /// recompila solo (entonces se activa REEXPO_CESIUM). Devuelve error o null.
+        /// </summary>
+        public static string InstallCesium()
+        {
+            try
+            {
+                string manifestPath = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Packages", "manifest.json"));
+                var root = JObject.Parse(File.ReadAllText(manifestPath));
+
+                // 1) scoped registry de Cesium (si falta)
+                if (!(root["scopedRegistries"] is JArray regs)) { regs = new JArray(); root["scopedRegistries"] = regs; }
+                bool hasRegistry = false;
+                foreach (var r in regs)
+                    if (string.Equals((string)r["url"], "https://unity.pkg.cesium.com", StringComparison.OrdinalIgnoreCase))
+                        hasRegistry = true;
+                if (!hasRegistry)
+                    regs.Add(new JObject
+                    {
+                        ["name"] = "Cesium",
+                        ["url"] = "https://unity.pkg.cesium.com",
+                        ["scopes"] = new JArray("com.cesium.unity"),
+                    });
+
+                // 2) dependencia com.cesium.unity
+                if (!(root["dependencies"] is JObject deps)) { deps = new JObject(); root["dependencies"] = deps; }
+                deps["com.cesium.unity"] = "1.23.3";
+
+                File.WriteAllText(manifestPath, root.ToString());
+                AssetDatabase.Refresh();
+                Client.Resolve(); // Unity instala y recompila (activa REEXPO_CESIUM)
+                return null;
+            }
+            catch (Exception e)
+            {
+                return e.Message;
+            }
         }
 
         // ---- helpers PKCE ----

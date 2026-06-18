@@ -1,163 +1,122 @@
 /* re-Expo92 WorldKit — estilos de las herramientas de editor (UI Toolkit).
-   Paleta Expo 92: azul #1B2A6B, naranja #FF6B35, sol #F7A81B. */
+   Estética Windows 95 (relieves) + paleta Expo 92. Texto negro = legible. */
 
 .rx-root {
-    padding: 0;
     flex-grow: 1;
+    background-color: #c0c0c0;            /* gris Win95 */
 }
 
-/* ---- cabecera de marca ---- */
+/* ---- barra de título (azul Win95) ---- */
 .rx-header {
     flex-direction: row;
     align-items: center;
     background-color: #1B2A6B;
-    border-bottom-width: 4px;
+    border-bottom-width: 3px;
     border-bottom-color: #FF6B35;
-    padding: 12px 14px;
-    margin: 0 0 10px 0;
+    padding: 8px 10px;
+    margin: 0;
 }
-.rx-logo {
-    width: 38px;
-    height: 38px;
-    margin-right: 10px;
-    -unity-background-scale-mode: scale-to-fit;
-}
-.rx-header-title {
-    color: #ffffff;
-    font-size: 15px;
-    -unity-font-style: bold;
-}
-.rx-header-sub {
-    color: #ffd9a8;
-    font-size: 11px;
-    -unity-font-style: normal;
-}
+.rx-logo { width: 34px; height: 34px; margin-right: 8px; -unity-background-scale-mode: scale-to-fit; }
+.rx-header-title { color: #ffffff; font-size: 14px; -unity-font-style: bold; }
+.rx-header-sub { color: #ffd9a8; font-size: 11px; }
 
-/* ---- contenido ---- */
-.rx-body {
-    padding: 4px 14px 12px 14px;
-}
-.rx-section-title {
-    color: #1B2A6B;
-    font-size: 13px;
-    -unity-font-style: bold;
-    margin: 12px 0 6px 0;
-}
+/* ---- cuerpo ---- */
+.rx-body { padding: 10px 12px; background-color: #c0c0c0; flex-grow: 1; }
+.rx-section-title { color: #000000; font-size: 13px; -unity-font-style: bold; margin: 10px 0 5px 0; }
 
-/* ---- tarjeta ---- */
+/* ---- tarjeta hundida (inset Win95) ---- */
 .rx-card {
-    background-color: #fbf5e9;
-    border-width: 1px;
-    border-color: #c9b48f;
-    border-radius: 5px;
-    padding: 10px 12px;
-    margin: 0 0 10px 0;
+    background-color: #f4ead6;
+    border-top-width: 2px; border-left-width: 2px; border-right-width: 2px; border-bottom-width: 2px;
+    border-top-color: #808080; border-left-color: #808080;
+    border-right-color: #ffffff; border-bottom-color: #ffffff;
+    border-radius: 0;
+    padding: 10px 12px; margin: 0 0 10px 0;
 }
 
-/* ---- pastilla de estado con punto ---- */
-.rx-statusbar {
-    flex-direction: row;
-    align-items: center;
-    margin: 2px 0 8px 0;
+/* legibilidad: negro sobre claro */
+.rx-para { color: #1a1714; white-space: normal; margin: 0 0 8px 0; font-size: 12px; }
+.rx-note { color: #5b3a1a; font-size: 11px; white-space: normal; margin: 4px 0; }
+.rx-status-text { color: #1a1714; font-size: 12px; }
+.rx-steptitle { color: #1B2A6B; -unity-font-style: bold; font-size: 13px; margin: 0 0 8px 0; }
+
+/* campos de Unity dentro de la tarjeta (labels e inputs legibles) */
+.rx-card .unity-base-field__label { color: #1a1714; min-width: 86px; font-size: 12px; }
+.rx-card .unity-base-text-field__input {
+    background-color: #ffffff; color: #000000;
+    border-top-color: #808080; border-left-color: #808080;
+    border-right-color: #ffffff; border-bottom-color: #ffffff;
 }
-.rx-dot {
-    width: 9px;
-    height: 9px;
-    border-radius: 5px;
-    margin-right: 7px;
-    background-color: #9aa0a6;
+.rx-card .unity-toggle__label { color: #1a1714; font-size: 12px; }
+
+/* ---- botones Win95 (relieve) ---- */
+.rx-btn {
+    padding: 5px 12px; -unity-font-style: bold; margin: 4px 4px 0 0; border-radius: 0;
+    border-top-width: 2px; border-left-width: 2px; border-right-width: 2px; border-bottom-width: 2px;
 }
+.rx-btn--primary {
+    background-color: #FF6B35; color: #ffffff;
+    border-top-color: #ffb591; border-left-color: #ffb591;
+    border-right-color: #a83a12; border-bottom-color: #a83a12;
+}
+.rx-btn--primary:hover { background-color: #ff7d4d; }
+.rx-btn--secondary {
+    background-color: #c0c0c0; color: #000000;
+    border-top-color: #ffffff; border-left-color: #ffffff;
+    border-right-color: #808080; border-bottom-color: #808080;
+}
+.rx-btn--secondary:hover { background-color: #d4d4d4; }
+.rx-btn--ghost {
+    background-color: #c0c0c0; color: #1B2A6B;
+    border-top-color: #ffffff; border-left-color: #ffffff;
+    border-right-color: #808080; border-bottom-color: #808080;
+}
+.rx-btn:active {
+    border-top-color: #808080; border-left-color: #808080;
+    border-right-color: #ffffff; border-bottom-color: #ffffff;
+}
+.rx-btn:disabled { opacity: 0.45; }
+
+/* ---- estado con punto ---- */
+.rx-statusbar { flex-direction: row; align-items: center; margin: 2px 0 8px 0; }
+.rx-dot { width: 10px; height: 10px; margin-right: 7px; background-color: #808080; border-width: 1px; border-color: #404040; }
 .rx-dot--on { background-color: #2e7d4f; }
 .rx-dot--off { background-color: #c0392b; }
 .rx-dot--warn { background-color: #F7A81B; }
-.rx-status-text { font-size: 12px; }
 
-/* ---- botones ---- */
-.rx-row { flex-direction: row; }
-.rx-btn {
-    border-radius: 5px;
-    padding: 5px 10px;
-    -unity-font-style: bold;
-    margin: 4px 4px 0 0;
-}
-.rx-btn--primary {
-    background-color: #FF6B35;
-    color: #ffffff;
-    border-width: 0;
-}
-.rx-btn--primary:hover { background-color: #ff5418; }
-.rx-btn--secondary {
-    background-color: #e9ddc4;
-    color: #3a2c12;
-    border-color: #c9b48f;
-}
-.rx-btn--ghost {
-    background-color: rgba(0, 0, 0, 0);
-    color: #2f44a0;
-    border-width: 0;
-}
-.rx-btn:disabled { opacity: 0.5; }
+/* ---- separador hundido ---- */
+.rx-sep { height: 0; margin: 10px 0; border-top-width: 1px; border-top-color: #808080; border-bottom-width: 1px; border-bottom-color: #ffffff; }
 
-/* ---- texto auxiliar ---- */
-.rx-note {
-    color: #8a6d2f;
-    font-size: 11px;
-    white-space: normal;
-    margin: 4px 0;
-}
-.rx-para {
-    white-space: normal;
-    margin: 0 0 8px 0;
-}
-.rx-sep {
-    height: 1px;
-    background-color: rgba(0, 0, 0, 0.12);
-    margin: 10px 0;
-}
-
-/* ---- pasos del asistente (puntos) ---- */
-.rx-steps {
-    flex-direction: row;
-    align-items: center;
-    margin: 2px 0 10px 0;
-}
+/* ---- pasos: cuadrados con relieve ---- */
+.rx-steps { flex-direction: row; align-items: center; margin: 8px 0 8px 0; }
 .rx-step {
-    width: 22px;
-    height: 22px;
-    border-radius: 11px;
-    background-color: #e0d5bd;
-    color: #7a6a4d;
-    -unity-text-align: middle-center;
-    font-size: 11px;
-    -unity-font-style: bold;
-    margin-right: 4px;
+    width: 22px; height: 22px; margin-right: 5px;
+    background-color: #c0c0c0; color: #404040;
+    -unity-text-align: middle-center; font-size: 11px; -unity-font-style: bold;
+    border-top-width: 2px; border-left-width: 2px; border-right-width: 2px; border-bottom-width: 2px;
+    border-top-color: #ffffff; border-left-color: #ffffff;
+    border-right-color: #808080; border-bottom-color: #808080;
 }
-.rx-step--active {
-    background-color: #1B2A6B;
-    color: #ffffff;
-}
-.rx-step--done {
-    background-color: #2e7d4f;
-    color: #ffffff;
-}
-.rx-steptitle {
-    color: #2f44a0;
-    -unity-font-style: bold;
-    margin: 0 0 8px 0;
-}
+.rx-step--active { background-color: #1B2A6B; color: #ffffff; }
+.rx-step--done { background-color: #2e7d4f; color: #ffffff; }
 
 /* ---- checklist ---- */
-.rx-check { flex-direction: row; margin: 0 0 4px 0; align-items: flex-start; }
-.rx-check-ok { color: #2e7d4f; -unity-font-style: bold; margin-right: 6px; }
+.rx-check { flex-direction: row; margin: 0 0 5px 0; align-items: flex-start; }
+.rx-check-ok { color: #1a7a3f; -unity-font-style: bold; margin-right: 6px; }
 .rx-check-no { color: #c0392b; -unity-font-style: bold; margin-right: 6px; }
-.rx-check-tx { white-space: normal; flex-grow: 1; }
+.rx-check-tx { color: #1a1714; white-space: normal; flex-grow: 1; font-size: 12px; }
 
-/* ---- estado / feedback ---- */
-.rx-feedback {
-    white-space: normal;
-    margin: 8px 0 2px 0;
-    font-size: 12px;
+/* ---- feedback ---- */
+.rx-feedback { white-space: normal; margin: 8px 0 2px 0; font-size: 12px; color: #1a1714; }
+.rx-feedback--ok { color: #1a7a3f; }
+.rx-feedback--err { color: #b01810; }
+.rx-feedback--busy { color: #1B2A6B; }
+
+/* ---- caja de aviso (amarilla, hundida) ---- */
+.rx-warn {
+    background-color: #fff6d6; color: #6a5300; font-size: 11px; white-space: normal;
+    border-top-width: 2px; border-left-width: 2px; border-right-width: 2px; border-bottom-width: 2px;
+    border-top-color: #b8a14a; border-left-color: #b8a14a;
+    border-right-color: #fffbe6; border-bottom-color: #fffbe6;
+    padding: 8px 10px; margin: 6px 0;
 }
-.rx-feedback--ok { color: #2e7d4f; }
-.rx-feedback--err { color: #c0392b; }
-.rx-feedback--busy { color: #2f44a0; }

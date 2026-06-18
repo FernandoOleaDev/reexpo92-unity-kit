@@ -7,7 +7,7 @@ namespace ReExpo92.WorldKit.Editor
     /// <summary>
     /// Panel de control principal del package: estado de sesión, login, y la
     /// construcción del mundo georreferenciado con sus capas. UI Toolkit con la
-    /// estética Expo 92 (ver <see cref="ReExpoUI"/>).
+    /// estética Windows 95 + Expo 92 (estilos inline, ver <see cref="ReExpoUI"/>).
     /// </summary>
     public class ControlPanelWindow : EditorWindow
     {
@@ -16,12 +16,12 @@ namespace ReExpo92.WorldKit.Editor
         Label _status;
         Toggle _tiles, _pois, _zones;
 
-        [MenuItem("Tools/re-Expo92/Panel de control")]
+        [MenuItem("re-Expo92/Panel de control", false, 0)]
         public static void Open()
         {
             var w = GetWindow<ControlPanelWindow>();
             w.titleContent = new GUIContent("re-Expo92", ReExpoUI.LoadLogo());
-            w.minSize = new Vector2(360, 420);
+            w.minSize = new Vector2(360, 440);
             ReExpoEditorService.Restore();
         }
 
@@ -36,11 +36,9 @@ namespace ReExpo92.WorldKit.Editor
             var root = rootVisualElement;
             root.Clear();
             ReExpoUI.ApplyStyle(root);
-
             root.Add(ReExpoUI.Header("Mundo georreferenciado de la Cartuja"));
 
-            var body = new VisualElement();
-            body.AddToClassList("rx-body");
+            var body = ReExpoUI.Body();
             root.Add(body);
 
             // ---- sesión ----
@@ -56,12 +54,11 @@ namespace ReExpo92.WorldKit.Editor
             else
             {
                 account.Add(ReExpoUI.StatusBar("off", "No has iniciado sesión."));
-                _email = new TextField("Email");
-                _password = new TextField("Contraseña") { isPasswordField = true };
+                _email = ReExpoUI.Field("Email");
+                _password = ReExpoUI.Field("Contraseña", true);
                 account.Add(_email);
                 account.Add(_password);
-                var row = new VisualElement();
-                row.AddToClassList("rx-row");
+                var row = ReExpoUI.Row();
                 var bPwd = ReExpoUI.Primary("Entrar", SignInPassword, "🔑");
                 var bGoogle = ReExpoUI.Secondary("Con Google", SignInGoogle, "🟢");
                 bPwd.style.flexGrow = 1; bGoogle.style.flexGrow = 1;
@@ -78,23 +75,21 @@ namespace ReExpo92.WorldKit.Editor
             world.Add(ReExpoUI.StatusBar(cesium ? "on" : "warn",
                 cesium ? "Cesium for Unity detectado." : "Cesium for Unity NO instalado (com.cesium.unity)."));
 
-            _tiles = new Toggle("🌍  Maqueta de Google (referencia)") { value = true };
-            _pois = new Toggle("📌  POIs (re-memorias)") { value = true };
-            _zones = new Toggle("▰  Zonas del recinto") { value = true };
+            _tiles = ReExpoUI.Toggle("🌍  Maqueta de Google (referencia)", true);
+            _pois = ReExpoUI.Toggle("📌  POIs (re-memorias)", true);
+            _zones = ReExpoUI.Toggle("▰  Zonas del recinto", true);
             world.Add(_tiles); world.Add(_pois); world.Add(_zones);
 
             var build = ReExpoUI.Primary("Descargar datos y construir mundo", BuildWorld, "🏗");
             build.SetEnabled(cesium && ReExpoEditorService.IsLoggedIn);
             world.Add(build);
 
-            _status = new Label(string.Empty);
-            _status.AddToClassList("rx-feedback");
+            _status = ReExpoUI.Feedback();
             world.Add(_status);
 
             // ---- pie ----
             body.Add(ReExpoUI.Separator());
-            var foot = new VisualElement();
-            foot.AddToClassList("rx-row");
+            var foot = ReExpoUI.Row();
             foot.Add(ReExpoUI.Ghost("Re-ejecutar asistente", SetupWizardWindow.Open, "🧭"));
             foot.Add(ReExpoUI.Ghost("Documentación", () =>
                 Application.OpenURL("https://github.com/FernandoOleaDev/reexpo92-unity-kit#readme"), "❔"));
@@ -104,36 +99,26 @@ namespace ReExpo92.WorldKit.Editor
         // ---- handlers ----
         async void SignInPassword()
         {
-            SetStatus("busy", "Entrando…");
+            ReExpoUI.SetFeedback(_status, "busy", "Entrando…");
             var err = await ReExpoEditorService.SignInPassword(_email.value, _password.value);
-            if (err != null) { SetStatus("err", "Error: " + err); return; }
+            if (err != null) { ReExpoUI.SetFeedback(_status, "err", "Error: " + err); return; }
             Render();
         }
 
         async void SignInGoogle()
         {
-            SetStatus("busy", "Abriendo el navegador para Google…");
+            ReExpoUI.SetFeedback(_status, "busy", "Abriendo el navegador para Google…");
             var err = await ReExpoEditorService.SignInGoogle();
-            if (err != null) { SetStatus("err", "Error: " + err); return; }
+            if (err != null) { ReExpoUI.SetFeedback(_status, "err", "Error: " + err); return; }
             Render();
         }
 
         async void BuildWorld()
         {
-            SetStatus("busy", "Descargando datos y construyendo…");
+            ReExpoUI.SetFeedback(_status, "busy", "Descargando datos y construyendo…");
             var msg = await ReExpoEditorService.BuildWorld(_tiles.value, _pois.value, _zones.value);
             bool ok = msg != null && msg.StartsWith("OK");
-            SetStatus(ok ? "ok" : "err", msg ?? "Listo.");
-        }
-
-        void SetStatus(string kind, string text)
-        {
-            if (_status == null) return;
-            _status.text = text;
-            _status.RemoveFromClassList("rx-feedback--ok");
-            _status.RemoveFromClassList("rx-feedback--err");
-            _status.RemoveFromClassList("rx-feedback--busy");
-            _status.AddToClassList(kind == "ok" ? "rx-feedback--ok" : kind == "err" ? "rx-feedback--err" : "rx-feedback--busy");
+            ReExpoUI.SetFeedback(_status, ok ? "ok" : "err", msg ?? "Listo.");
         }
     }
 }

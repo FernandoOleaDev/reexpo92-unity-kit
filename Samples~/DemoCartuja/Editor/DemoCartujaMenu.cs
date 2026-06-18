@@ -6,7 +6,7 @@ namespace ReExpo92.WorldKit.Samples
     /// <summary>Atajo de menú para construir la demo de la Cartuja.</summary>
     static class DemoCartujaMenu
     {
-        [MenuItem("Tools/re-Expo92/Samples/Construir demo Cartuja")]
+        [MenuItem("re-Expo92/Samples/Construir demo Cartuja", false, 100)]
         static async void BuildDemo()
         {
             var msg = await ReExpoEditorService.BuildWorld(true, true, true);

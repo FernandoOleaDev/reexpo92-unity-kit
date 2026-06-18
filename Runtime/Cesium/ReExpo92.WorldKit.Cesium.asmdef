@@ -3,7 +3,7 @@
   "rootNamespace": "ReExpo92.WorldKit.Cesium",
   "references": [
     "ReExpo92.WorldKit",
-    "CesiumRuntime"
+    "CesiumForUnity"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],
