@@ -24,7 +24,6 @@ namespace ReExpo92.WorldKit.Editor
 
         static readonly string[] TabNames = { "Re-memorias", "Configuración", "Ayuda" };
         [SerializeField] int _tab;
-        bool _wire;
         Toggle _tiles, _pois, _zones; // capas a construir (mismo set que el Panel de control)
 
         List<ReMemoryItem> _items;
@@ -98,8 +97,8 @@ namespace ReExpo92.WorldKit.Editor
             tb.Add(LayerToggle("▰ Zonas", "Zonas"));
             tb.Add(LayerToggle("🌍 Tiles", "Google Photorealistic 3D Tiles"));
             tb.Add(new ToolbarSpacer());
-            var wf = new ToolbarToggle { text = "▦ Wireframe", value = _wire };
-            wf.RegisterValueChangedCallback(e => SetWire(e.newValue));
+            var wf = new ToolbarToggle { text = "▦ Wireframe", value = ReExpoWire.Enabled };
+            wf.RegisterValueChangedCallback(e => { ReExpoWire.Enabled = e.newValue; Status("ok", e.newValue ? "Modo técnico ON (Scene + Game)." : "Modo técnico OFF."); });
             tb.Add(wf);
             tb.Add(new ToolbarSpacer());
             tb.Add(new ToolbarButton(Recenter) { text = "🎯 Recentrar" });
@@ -308,6 +307,47 @@ namespace ReExpo92.WorldKit.Editor
                 "Desactívalo si necesitas navegar fuera del recinto. El cambio se aplica al momento."));
             c.Add(card);
 
+            // ---- Wireframe técnico (líneas baricéntricas + arcoíris, para vídeo) ----
+            var cardW = ReExpoUI.Card();
+            cardW.Add(ReExpoUI.SectionTitle("Wireframe técnico"));
+            var wOn = ReExpoUI.Toggle("Activar wireframe (se ve en Scene y Game)", ReExpoWire.Enabled);
+            wOn.RegisterValueChangedCallback(e => ReExpoWire.Enabled = e.newValue);
+            cardW.Add(wOn);
+
+            var wRainbow = ReExpoUI.Toggle("Color arcoíris por distancia", ReExpoWire.Rainbow);
+            wRainbow.RegisterValueChangedCallback(e => ReExpoWire.Rainbow = e.newValue);
+            cardW.Add(wRainbow);
+
+            var wWidth = new UnityEngine.UIElements.FloatField("Grosor de línea (px)") { value = ReExpoWire.LineWidth };
+            StyleFieldLabel(wWidth);
+            wWidth.RegisterValueChangedCallback(e => ReExpoWire.LineWidth = e.newValue);
+            cardW.Add(wWidth);
+
+            var wCol = new UnityEditor.UIElements.ColorField("Color de línea (si no arcoíris)") { value = ReExpoWire.LineColor, showAlpha = true, hdr = false };
+            StyleFieldLabel(wCol);
+            wCol.RegisterValueChangedCallback(e => ReExpoWire.LineColor = e.newValue);
+            cardW.Add(wCol);
+
+            var wFace = new UnityEngine.UIElements.FloatField("Opacidad de cara (0 = solo aristas)") { value = ReExpoWire.FaceAlpha };
+            StyleFieldLabel(wFace);
+            wFace.RegisterValueChangedCallback(e => ReExpoWire.FaceAlpha = e.newValue);
+            cardW.Add(wFace);
+
+            var wNear = new UnityEngine.UIElements.FloatField("Arcoíris: cerca (m)") { value = ReExpoWire.FadeNear };
+            StyleFieldLabel(wNear);
+            wNear.RegisterValueChangedCallback(e => ReExpoWire.FadeNear = e.newValue);
+            cardW.Add(wNear);
+
+            var wFar = new UnityEngine.UIElements.FloatField("Arcoíris: lejos (m)") { value = ReExpoWire.FadeFar };
+            StyleFieldLabel(wFar);
+            wFar.RegisterValueChangedCallback(e => ReExpoWire.FadeFar = e.newValue);
+            cardW.Add(wFar);
+
+            cardW.Add(ReExpoUI.Note(
+                "Líneas reales del triángulo (baricéntricas horneadas por tile) → van en Game, con grosor y degradado arcoíris por distancia. " +
+                "Al activarlo, los tiles se procesan poco a poco (puede dar micro-tirones); es para grabar en editor."));
+            c.Add(cardW);
+
             var cardCat = ReExpoUI.Card();
             cardCat.Add(ReExpoUI.SectionTitle("POIs por categoría"));
             var allTog = ReExpoUI.Toggle("Mostrar TODAS las categorías", ReExpoPoiFilter.AllCategories);
@@ -460,15 +500,6 @@ namespace ReExpo92.WorldKit.Editor
             if (t == null) { Status("err", "Capa no encontrada: " + child); return; }
             t.gameObject.SetActive(on);
             Status("ok", child + (on ? " · visible" : " · oculta"));
-        }
-
-        void SetWire(bool on)
-        {
-            var sv = SceneView.lastActiveSceneView;
-            if (sv == null) { Status("err", "Abre una ventana Scene primero."); return; }
-            _wire = on;
-            sv.cameraMode = SceneView.GetBuiltinCameraMode(on ? DrawCameraMode.Wireframe : DrawCameraMode.Textured);
-            sv.Repaint();
         }
 
         void Recenter()

@@ -55,6 +55,7 @@ namespace ReExpo92.WorldKit.Cesium
                                        ReExpoConfig.WorldBoxHeightMeters,
                                        ReExpoConfig.WorldBoxSizeMeters);
                 tilesGO.AddComponent<ReExpoBoxExcluder>();
+                tilesGO.AddComponent<ReExpoTechWire>(); // modo técnico (wireframe/rayos-X con degradado)
             }
 
             var poiMat = MakeMat(PoiColor);
