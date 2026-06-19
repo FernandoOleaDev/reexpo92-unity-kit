@@ -24,7 +24,7 @@ namespace ReExpo92.WorldKit.Editor
 
         public static Vector3 BallRotOffset
         {
-            get => GetVec("ReExpo92.BallRot", new Vector3(50f, -145f, 0f));
+            get => GetVec("ReExpo92.BallRot", new Vector3(120f, 35f, 0f));
             set { SetVec("ReExpo92.BallRot", value); Push(); }
         }
 
@@ -65,6 +65,18 @@ namespace ReExpo92.WorldKit.Editor
             set { EditorPrefs.SetFloat("ReExpo92.LabelFar", Mathf.Max(NearRadius + 1f, value)); Push(); }
         }
 
+        public static bool RaiseOverBuildings
+        {
+            get => EditorPrefs.GetBool("ReExpo92.PinRaise", true);
+            set { EditorPrefs.SetBool("ReExpo92.PinRaise", value); Push(); }
+        }
+
+        public static float PinClearanceMeters
+        {
+            get => EditorPrefs.GetFloat("ReExpo92.PinClearance", 5f);
+            set { EditorPrefs.SetFloat("ReExpo92.PinClearance", Mathf.Clamp(value, 0f, 200f)); Push(); }
+        }
+
         /// Aplica el tamaño de fuente a los carteles ya creados (vivo) y reajusta su fondo.
         static void ApplyFontSize()
         {
@@ -97,6 +109,8 @@ namespace ReExpo92.WorldKit.Editor
             ReExpoLabelConfig.LabelFontSize = LabelFontSize;
             ReExpoLabelConfig.NearRadius = NearRadius;
             ReExpoLabelConfig.FarRadius = Mathf.Max(NearRadius + 1f, FarRadius);
+            ReExpoLabelConfig.RaiseOverBuildings = RaiseOverBuildings;
+            ReExpoLabelConfig.PinClearanceMeters = PinClearanceMeters;
             SceneView.RepaintAll();
         }
 

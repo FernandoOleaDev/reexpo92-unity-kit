@@ -25,6 +25,7 @@ namespace ReExpo92.WorldKit.Editor
         static readonly string[] TabNames = { "Re-memorias", "Configuración", "Ayuda" };
         [SerializeField] int _tab;
         bool _wire;
+        Toggle _tiles, _pois, _zones; // capas a construir (mismo set que el Panel de control)
 
         List<ReMemoryItem> _items;
         List<ReMemoryItem> _filtered = new List<ReMemoryItem>();
@@ -280,6 +281,23 @@ namespace ReExpo92.WorldKit.Editor
         // ---------- pestaña Configuración ----------
         void RenderConfig(VisualElement c)
         {
+            // ---- Construir mundo (mismo bloque/función que el Panel de control) ----
+            var cardBuild = ReExpoUI.Card();
+            cardBuild.Add(ReExpoUI.SectionTitle("Construir mundo"));
+            bool cesium = WorldBuilderLocator.IsAvailable;
+            cardBuild.Add(ReExpoUI.StatusBar(cesium ? "on" : "warn",
+                cesium ? "Cesium for Unity detectado." : "Cesium for Unity NO instalado (com.cesium.unity)."));
+            _tiles = ReExpoUI.Toggle("🌍  Maqueta de Google (referencia)", true);
+            _pois = ReExpoUI.Toggle("📌  POIs (re-memorias)", true);
+            _zones = ReExpoUI.Toggle("▰  Zonas del recinto", true);
+            cardBuild.Add(_tiles); cardBuild.Add(_pois); cardBuild.Add(_zones);
+            var build = ReExpoUI.Primary("Descargar datos y construir mundo", BuildWorldFromTools, "🏗");
+            build.SetEnabled(cesium && ReExpoEditorService.IsLoggedIn);
+            cardBuild.Add(build);
+            if (!ReExpoEditorService.IsLoggedIn)
+                cardBuild.Add(ReExpoUI.Note("Inicia sesión en el Panel de control para poder construir."));
+            c.Add(cardBuild);
+
             var card = ReExpoUI.Card();
             card.Add(ReExpoUI.SectionTitle("Carga de la maqueta"));
             var t = ReExpoUI.Toggle("Limitar la carga a la Cartuja + alrededores (recomendado)", BoundsEnabled());
@@ -353,6 +371,15 @@ namespace ReExpo92.WorldKit.Editor
             cardL.Add(radiosVal);
 
             cardL.Add(ReExpoUI.Note("Más cerca del «radio cercano» → tamaño máximo; más lejos del «radio lejano» → desaparece; en medio, escala. El lejano siempre se fuerza mayor que el cercano. Posición del cartel en ejes de cámara (x=derecha, y=arriba, z=al fondo)."));
+
+            var raise = ReExpoUI.Toggle("Elevar POIs sobre edificios que los tapen", ReExpoLabels.RaiseOverBuildings);
+            raise.RegisterValueChangedCallback(e => ReExpoLabels.RaiseOverBuildings = e.newValue);
+            cardL.Add(raise);
+            var clear = new UnityEngine.UIElements.FloatField("Holgura sobre el tejado (m)") { value = ReExpoLabels.PinClearanceMeters };
+            StyleFieldLabel(clear);
+            clear.RegisterValueChangedCallback(e => ReExpoLabels.PinClearanceMeters = e.newValue);
+            cardL.Add(clear);
+            cardL.Add(ReExpoUI.Note("La BASE del POI no se mueve. Se detecta el edificio actual sobre cada POI (malla de Google) y se estira el palo para que la bola y el cartel asomen por encima. Estos dos ajustes se aplican al RECONSTRUIR el mundo."));
             c.Add(cardL);
 
             // ---- Cartel LED de zona (texto que gira por el perímetro) ----
@@ -558,5 +585,14 @@ namespace ReExpo92.WorldKit.Editor
             }
         }
         void Status(string kind, string text) => ReExpoUI.SetFeedback(_status, kind, text);
+
+        // Construye el mundo con la MISMA función que el Panel de control.
+        async void BuildWorldFromTools()
+        {
+            Status("busy", "Descargando datos y construyendo…");
+            var msg = await ReExpoEditorService.BuildWorld(_tiles.value, _pois.value, _zones.value);
+            bool ok = msg != null && msg.StartsWith("OK");
+            Status(ok ? "ok" : "err", msg ?? "Listo.");
+        }
     }
 }

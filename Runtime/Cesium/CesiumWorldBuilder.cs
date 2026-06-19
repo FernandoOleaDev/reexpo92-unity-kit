@@ -63,6 +63,7 @@ namespace ReExpo92.WorldKit.Cesium
             // recopilación para ajustar alturas al terreno
             var samples = new List<(CesiumGlobeAnchor anchor, double lng, double lat, double offset)>();
             var zoneRecords = new List<(Mesh mesh, Transform owner, List<CesiumGlobeAnchor> verts, ReExpoZoneTicker ticker, string label)>();
+            var poiPins = new List<(CesiumGlobeAnchor anchor, double lng, double lat, ReExpoPin pin)>();
 
             // --- POIs (re-memorias situadas) ---
             if (o.ShowPois && o.Data?.Pois != null && o.Data.Pois.Count > 0)
@@ -80,12 +81,13 @@ namespace ReExpo92.WorldKit.Cesium
                     anchor.SetPositionLongitudeLatitudeHeight(p.Lng, p.Lat, poiH);
                     if (p.Heading.HasValue)
                         go.transform.localRotation = Quaternion.Euler(0f, (float)p.Heading.Value, 0f);
-                    BuildPin(go.transform, poiMat, bolaMat);
-                    AddLabel(go.transform, p.Name ?? p.ReMemoryId);
+                    var pin = BuildPin(go.transform, poiMat, bolaMat);
+                    pin.label = AddLabel(go.transform, p.Name ?? p.ReMemoryId);
                     var pref = go.AddComponent<ReExpoPoiRef>();
                     pref.ReMemoryId = p.ReMemoryId; pref.PoiName = p.Name; pref.Category = p.Category;
                     if (!p.GroundEllip.HasValue)
                         samples.Add((anchor, p.Lng, p.Lat, 0.0)); // sin cota cacheada → muestrear la malla
+                    poiPins.Add((anchor, p.Lng, p.Lat, pin)); // para elevar el pin sobre edificios
                 }
             }
 
@@ -131,9 +133,9 @@ namespace ReExpo92.WorldKit.Cesium
                 }
             }
 
-            // --- Ajuste de alturas al terreno real (async, si hay tiles) ---
-            if (tileset != null && samples.Count > 0)
-                AdjustHeightsAsync(tileset, samples, zoneRecords);
+            // --- Ajuste de alturas al terreno real + elevar pins sobre edificios ---
+            if (tileset != null && (samples.Count > 0 || poiPins.Count > 0))
+                AdjustHeightsAsync(tileset, samples, zoneRecords, poiPins);
 
             return root;
         }
@@ -142,34 +144,72 @@ namespace ReExpo92.WorldKit.Cesium
         static async void AdjustHeightsAsync(
             Cesium3DTileset tileset,
             List<(CesiumGlobeAnchor anchor, double lng, double lat, double offset)> samples,
-            List<(Mesh mesh, Transform owner, List<CesiumGlobeAnchor> verts, ReExpoZoneTicker ticker, string label)> zones)
+            List<(Mesh mesh, Transform owner, List<CesiumGlobeAnchor> verts, ReExpoZoneTicker ticker, string label)> zones,
+            List<(CesiumGlobeAnchor anchor, double lng, double lat, ReExpoPin pin)> poiPins)
         {
-            if (tileset == null || samples.Count == 0) return;
-            var positions = new double3[samples.Count];
-            for (int i = 0; i < samples.Count; i++)
-                positions[i] = new double3(samples[i].lng, samples[i].lat, 0);
+            if (tileset == null) return;
 
-            CesiumSampleHeightResult res;
-            try { res = await tileset.SampleHeightMostDetailed(positions); }
-            catch { return; }
-            if (res?.longitudeLatitudeHeightPositions == null) return;
-
-            for (int i = 0; i < samples.Count && i < res.longitudeLatitudeHeightPositions.Length; i++)
+            // --- 1) Cota de suelo de RESPALDO (solo puntos sin cota cacheada) ---
+            if (samples.Count > 0)
             {
-                var s = samples[i];
-                if (s.anchor == null) continue;
-                bool ok = res.sampleSuccess != null && i < res.sampleSuccess.Length && res.sampleSuccess[i];
-                double h = ok ? res.longitudeLatitudeHeightPositions[i].z : ReExpoConfig.GroundHeightMeters;
-                s.anchor.SetPositionLongitudeLatitudeHeight(s.lng, s.lat, h + s.offset);
+                var positions = new double3[samples.Count];
+                for (int i = 0; i < samples.Count; i++)
+                    positions[i] = new double3(samples[i].lng, samples[i].lat, 0);
+
+                CesiumSampleHeightResult res = null;
+                try { res = await tileset.SampleHeightMostDetailed(positions); }
+                catch { /* sin tiles cargados todavía */ }
+                if (res?.longitudeLatitudeHeightPositions != null)
+                {
+                    for (int i = 0; i < samples.Count && i < res.longitudeLatitudeHeightPositions.Length; i++)
+                    {
+                        var s = samples[i];
+                        if (s.anchor == null) continue;
+                        bool ok = res.sampleSuccess != null && i < res.sampleSuccess.Length && res.sampleSuccess[i];
+                        double h = ok ? res.longitudeLatitudeHeightPositions[i].z : ReExpoConfig.GroundHeightMeters;
+                        s.anchor.SetPositionLongitudeLatitudeHeight(s.lng, s.lat, h + s.offset);
+                    }
+
+                    // reconstruir los volúmenes de zona (y el cartel LED) tras mover los vértices
+                    foreach (var z in zones)
+                    {
+                        BuildZoneMesh(z.mesh, z.owner, z.verts, ReExpoConfig.ZoneHeightMeters);
+                        if (z.ticker != null)
+                            z.ticker.Configure(TransformsOf(z.verts), z.owner, z.label, ReExpoConfig.ZoneHeightMeters, ZoneColorFor(z.label));
+                    }
+                }
             }
 
-            // reconstruir los volúmenes de zona (y el cartel LED) tras mover los
-            // vértices al terreno
-            foreach (var z in zones)
+            // --- 2) Elevar pins sobre edificios que los tapen (muestreo DSM) ---
+            // Muestrea la SUPERFICIE de la malla de Google (tejados/árboles) en la
+            // coordenada de cada POI; si está por encima de la cabeza por defecto,
+            // estira el poste para que bola+cartel asomen `clearance` m por encima.
+            // La BASE no se mueve. Sin coste de API (es geometría ya cargada).
+            if (poiPins.Count > 0 && ReExpoLabelConfig.RaiseOverBuildings)
             {
-                BuildZoneMesh(z.mesh, z.owner, z.verts, ReExpoConfig.ZoneHeightMeters);
-                if (z.ticker != null)
-                    z.ticker.Configure(TransformsOf(z.verts), z.owner, z.label, ReExpoConfig.ZoneHeightMeters, ZoneColorFor(z.label));
+                var dpos = new double3[poiPins.Count];
+                for (int i = 0; i < poiPins.Count; i++)
+                    dpos[i] = new double3(poiPins[i].lng, poiPins[i].lat, 0);
+
+                CesiumSampleHeightResult dres = null;
+                try { dres = await tileset.SampleHeightMostDetailed(dpos); }
+                catch { /* nada que hacer */ }
+                if (dres?.longitudeLatitudeHeightPositions != null)
+                {
+                    for (int i = 0; i < poiPins.Count && i < dres.longitudeLatitudeHeightPositions.Length; i++)
+                    {
+                        var pp = poiPins[i];
+                        if (pp.pin == null || pp.anchor == null) continue;
+                        bool ok = dres.sampleSuccess != null && i < dres.sampleSuccess.Length && dres.sampleSuccess[i];
+                        if (!ok) continue;
+                        double dsm = dres.longitudeLatitudeHeightPositions[i].z;       // tejado/copa
+                        double ground = pp.anchor.longitudeLatitudeHeight.z;            // base real del POI
+                        float building = (float)(dsm - ground);                        // alto del edificio sobre el POI
+                        if (building <= 0.1f) continue;                                // suelo abierto → pin normal
+                        // base de la bola a `clearance` por encima del tejado (+ radio = centro)
+                        pp.pin.SetHeadCenterY(building + ReExpoLabelConfig.PinClearanceMeters + ReExpoPin.HeadRadius);
+                    }
+                }
             }
         }
 
@@ -248,6 +288,20 @@ namespace ReExpo92.WorldKit.Cesium
             return m;
         }
 
+        /// Material de TEXTO del cartel (SDF con contorno azul), COMPARTIDO por todos
+        /// los carteles para no instanciar uno por etiqueta ni tocar renderer.material.
+        static Material _labelTextMat;
+        static Material LabelTextMat(TMPro.TMP_FontAsset font)
+        {
+            if (_labelTextMat != null) return _labelTextMat;
+            if (font == null || font.material == null) return null;
+            var m = new Material(font.material);
+            if (m.HasProperty(TMPro.ShaderUtilities.ID_OutlineColor)) m.SetColor(TMPro.ShaderUtilities.ID_OutlineColor, new Color32(20, 30, 80, 255));
+            if (m.HasProperty(TMPro.ShaderUtilities.ID_OutlineWidth)) m.SetFloat(TMPro.ShaderUtilities.ID_OutlineWidth, 0.2f);
+            _labelTextMat = m;
+            return m;
+        }
+
         /// Material del fondo del cartel (azul translúcido, doble cara, tras el texto).
         static Material MakeLabelBgMat()
         {
@@ -275,7 +329,8 @@ namespace ReExpo92.WorldKit.Cesium
         }
 
         /// Pin tipo chincheta: poste desde el 0 local (a ras) + bola Expo encima.
-        static void BuildPin(Transform parent, Material poleMat, Material headMat)
+        /// Devuelve el <see cref="ReExpoPin"/> para poder elevar la cabeza después.
+        static ReExpoPin BuildPin(Transform parent, Material poleMat, Material headMat)
         {
             var pole = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             pole.name = "Pole";
@@ -288,10 +343,15 @@ namespace ReExpo92.WorldKit.Cesium
             var head = new GameObject("Head");
             head.transform.SetParent(parent, false);
             head.transform.localScale = Vector3.one * 7f;             // diámetro 7 m
-            head.transform.localPosition = new Vector3(0f, 15.5f, 0f); // apoyada sobre el poste (top=12 + radio 3.5)
+            head.transform.localPosition = new Vector3(0f, ReExpoPin.DefaultHeadY, 0f); // sobre el poste (top 12 + radio 3.5)
             head.AddComponent<MeshFilter>().sharedMesh = BolaMesh();   // UV sphere de alta resolución
             head.AddComponent<MeshRenderer>().sharedMaterial = headMat;
             head.AddComponent<ReExpoBillboardBall>(); // mira a cámara + inclinación
+
+            var pin = parent.gameObject.AddComponent<ReExpoPin>();
+            pin.pole = pole.transform;
+            pin.head = head.transform;
+            return pin;
         }
 
         static void StripCollider(GameObject go)
@@ -302,7 +362,7 @@ namespace ReExpo92.WorldKit.Cesium
 
         /// Cartel 3D (TextMeshPro) hijo del POI, con billboard. Sale a la derecha
         /// de la bola (offset configurable) y se oculta tras zonas/edificios.
-        static void AddLabel(Transform parent, string text)
+        static ReExpoBillboardLabel AddLabel(Transform parent, string text)
         {
             var go = new GameObject("Label");
             go.transform.SetParent(parent, false);
@@ -316,8 +376,10 @@ namespace ReExpo92.WorldKit.Cesium
             tmp.overflowMode = TextOverflowModes.Overflow;
             tmp.rectTransform.pivot = new Vector2(0f, 0.5f); // crece hacia la derecha
             tmp.rectTransform.sizeDelta = new Vector2(120f, 14f);
-            tmp.outlineColor = new Color32(20, 30, 80, 255);
-            tmp.outlineWidth = 0.2f;
+            // Contorno vía material COMPARTIDO (no tmp.outlineColor: ese setter llama a
+            // renderer.material e instancia/“filtra” materiales en modo edición).
+            var lm = LabelTextMat(tmp.font);
+            if (lm != null) tmp.fontSharedMaterial = lm;
 
             // fondo: quad azul translúcido detrás del texto, a su tamaño
             tmp.ForceMeshUpdate();
@@ -330,7 +392,7 @@ namespace ReExpo92.WorldKit.Cesium
             bg.transform.localScale = new Vector3(b.size.x + 4f, b.size.y + 2f, 1f);
             bg.GetComponent<MeshRenderer>().sharedMaterial = MakeLabelBgMat();
 
-            go.AddComponent<ReExpoBillboardLabel>();
+            return go.AddComponent<ReExpoBillboardLabel>();
         }
 
         /// Material no iluminado con color, robusto entre pipelines.
@@ -379,8 +441,10 @@ namespace ReExpo92.WorldKit.Cesium
                 for (int x = 0; x < lon; x++)
                 {
                     int i0 = y * stride + x, i1 = i0 + 1, i2 = i0 + stride, i3 = i2 + 1;
-                    tris[t++] = i0; tris[t++] = i2; tris[t++] = i1;
-                    tris[t++] = i1; tris[t++] = i2; tris[t++] = i3;
+                    // winding ANTIHORARIO visto desde fuera → cara frontal hacia fuera
+                    // (con culling Back por defecto se ve la superficie exterior).
+                    tris[t++] = i0; tris[t++] = i1; tris[t++] = i2;
+                    tris[t++] = i1; tris[t++] = i3; tris[t++] = i2;
                 }
             _bolaMesh = new Mesh { name = "BolaUVSphere" };
             _bolaMesh.vertices = verts;

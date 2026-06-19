@@ -16,7 +16,7 @@ namespace ReExpo92.WorldKit
         public static bool Enabled = true;
 
         /// Offset de rotación de la bola (grados, sobre el "mirar a cámara").
-        public static Vector3 BallRotOffset = new Vector3(50f, -145f, 0f);
+        public static Vector3 BallRotOffset = new Vector3(120f, 35f, 0f);
 
         /// Offset de rotación del cartel (grados, sobre el "mirar a cámara").
         public static Vector3 LabelRotOffset = Vector3.zero;
@@ -33,5 +33,12 @@ namespace ReExpo92.WorldKit
 
         public static float NearRadius = 200f;
         public static float FarRadius = 450f;
+
+        /// Elevar la cabeza+cartel por encima de un edificio actual que tape el POI
+        /// (se detecta muestreando la malla de Google al construir). La base NO se mueve.
+        public static bool RaiseOverBuildings = true;
+
+        /// Holgura (m) entre el tejado que tapa y la BASE de la bola al elevarla.
+        public static float PinClearanceMeters = 5f;
     }
 }

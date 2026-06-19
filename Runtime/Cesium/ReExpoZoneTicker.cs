@@ -235,7 +235,8 @@ namespace ReExpo92.WorldKit.Cesium
                 RefreshEmission();
             _wallY = ReExpoTickerConfig.BandMeters;
 
-            if (!_ready) return false;
+            // estado incompleto (recién creado / deserializado tras recompilar) → nada que pintar
+            if (!_ready || _chars == null || _ring == null || _dir == null || _cum == null) return false;
 
             float now = Application.isPlaying ? Time.time : Time.realtimeSinceStartup;
             float scroll = (now * ReExpoTickerConfig.SpeedMetersPerSec) % _perimeter;

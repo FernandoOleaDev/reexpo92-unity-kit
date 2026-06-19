@@ -168,7 +168,12 @@ namespace ReExpo92.WorldKit.Editor
             EditorSceneManager.MarkSceneDirty(go.scene);
             ReExpoPoiFilter.Apply(); // aplica el filtro de categorías (por defecto, solo pabellones)
             int pc = data?.Pois?.Count ?? 0, zc = data?.Zones?.Count ?? 0;
-            return $"OK · {pc} POIs y {zc} zonas. {(apiKey != null ? "Maqueta de Google activa." : "Sin maqueta de Google.")}";
+            int withGround = 0;
+            if (data?.Pois != null) foreach (var p in data.Pois) if (p.GroundEllip.HasValue) withGround++;
+            var summary = $"OK · {pc} POIs y {zc} zonas. {(apiKey != null ? "Maqueta de Google activa." : "Sin maqueta de Google.")}";
+            Debug.Log($"[re-Expo92] Mundo construido — {pc} POIs ({withGround} con cota de suelo real), {zc} zonas. " +
+                      $"{(apiKey != null ? "Maqueta de Google activa." : "Sin maqueta de Google.")}", go);
+            return summary;
         }
 
         // ---- sustitución segura del rig ----
