@@ -74,14 +74,18 @@ namespace ReExpo92.WorldKit.Cesium
                     var go = new GameObject("POI · " + (p.Name ?? p.ReMemoryId));
                     go.transform.SetParent(poiRoot.transform, false);
                     var anchor = go.AddComponent<CesiumGlobeAnchor>();
-                    anchor.SetPositionLongitudeLatitudeHeight(p.Lng, p.Lat, ReExpoConfig.GroundHeightMeters);
+                    // Cota REAL del suelo (Google Elevation, cacheada en BD). Si no
+                    // hay, se queda en la altura base y se muestrea la malla (fallback).
+                    double poiH = p.GroundEllip ?? ReExpoConfig.GroundHeightMeters;
+                    anchor.SetPositionLongitudeLatitudeHeight(p.Lng, p.Lat, poiH);
                     if (p.Heading.HasValue)
                         go.transform.localRotation = Quaternion.Euler(0f, (float)p.Heading.Value, 0f);
                     BuildPin(go.transform, poiMat, bolaMat);
                     AddLabel(go.transform, p.Name ?? p.ReMemoryId);
                     var pref = go.AddComponent<ReExpoPoiRef>();
                     pref.ReMemoryId = p.ReMemoryId; pref.PoiName = p.Name; pref.Category = p.Category;
-                    samples.Add((anchor, p.Lng, p.Lat, 0.0)); // el padre exacto a ras de suelo
+                    if (!p.GroundEllip.HasValue)
+                        samples.Add((anchor, p.Lng, p.Lat, 0.0)); // sin cota cacheada → muestrear la malla
                 }
             }
 
@@ -113,9 +117,11 @@ namespace ReExpo92.WorldKit.Cesium
                         var vgo = new GameObject("v" + i);
                         vgo.transform.SetParent(zgo.transform, false);
                         var a = vgo.AddComponent<CesiumGlobeAnchor>();
-                        a.SetPositionLongitudeLatitudeHeight(v.lng, v.lat, ReExpoConfig.GroundHeightMeters);
+                        double vh = v.ground ?? ReExpoConfig.GroundHeightMeters; // cota real cacheada o fallback
+                        a.SetPositionLongitudeLatitudeHeight(v.lng, v.lat, vh);
                         verts.Add(a);
-                        samples.Add((a, v.lng, v.lat, 0.0)); // base del volumen a ras de suelo
+                        if (!v.ground.HasValue)
+                            samples.Add((a, v.lng, v.lat, 0.0)); // sin cota → muestrear la malla
                     }
                     var mesh = new Mesh { name = "ZoneVolume" };
                     mf.sharedMesh = mesh;

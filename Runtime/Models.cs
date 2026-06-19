@@ -24,13 +24,16 @@ namespace ReExpo92.WorldKit
         public double? Heading;
         public string Status;
         public string Category;
+        /// Cota del SUELO en altura elipsoidal WGS84 (m), resuelta en BD vía Google
+        /// Elevation. null = no cacheada (se cae al muestreo de la malla de tiles).
+        public double? GroundEllip;
     }
 
-    /// <summary>Zona del recinto (polígono de coordenadas WGS84).</summary>
+    /// <summary>Zona del recinto (polígono de coordenadas WGS84 + cota por vértice).</summary>
     public class MapZone
     {
         public string Value;
-        public readonly List<(double lat, double lng)> Ring = new List<(double, double)>();
+        public readonly List<(double lat, double lng, double? ground)> Ring = new List<(double, double, double?)>();
     }
 
     /// <summary>Resultado de export_map_geojson ya parseado.</summary>
@@ -88,6 +91,8 @@ namespace ReExpo92.WorldKit
                         Category = props.Value<string>("category"),
                         Lng = coords.Count > 0 ? (double)coords[0] : 0,
                         Lat = coords.Count > 1 ? (double)coords[1] : 0,
+                        // 3ª coordenada GeoJSON = cota de suelo elipsoidal (si la hay)
+                        GroundEllip = coords.Count > 2 ? (double?)coords[2] : null,
                     });
                 }
                 else if (kind == "zone" && gtype == "Polygon")
@@ -100,7 +105,8 @@ namespace ReExpo92.WorldKit
                     {
                         var p = pt as JArray;
                         if (p == null || p.Count < 2) continue;
-                        z.Ring.Add(((double)p[1], (double)p[0])); // (lat, lng)
+                        double? g = p.Count > 2 ? (double?)p[2] : null; // 3ª coord = cota de suelo
+                        z.Ring.Add(((double)p[1], (double)p[0], g)); // (lat, lng, ground)
                     }
                     if (z.Ring.Count >= 3) data.Zones.Add(z);
                 }
