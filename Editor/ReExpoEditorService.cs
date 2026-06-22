@@ -230,6 +230,27 @@ namespace ReExpo92.WorldKit.Editor
             }
         }
 
+        // ---- instalar dependencias para construir Addressables ----
+        /// <summary>
+        /// Instala Unity Addressables (registro oficial). Al terminar, Unity recompila
+        /// y se activa REEXPO_ADDR (la ventana «Constructor de Addressables» aparece).
+        /// </summary>
+        public static string InstallAddressables()
+        {
+            try { Client.Add("com.unity.addressables"); return null; }
+            catch (Exception e) { return e.Message; }
+        }
+
+        /// <summary>
+        /// Instala glTFast (registro oficial). Registra un importador de .glb, así que
+        /// los modelos descargados se importan solos al caer en Assets/.
+        /// </summary>
+        public static string InstallGltfast()
+        {
+            try { Client.Add("com.unity.cloud.gltfast"); return null; }
+            catch (Exception e) { return e.Message; }
+        }
+
         // ---- helpers PKCE ----
         static string RandomUrlToken(int bytes)
         {

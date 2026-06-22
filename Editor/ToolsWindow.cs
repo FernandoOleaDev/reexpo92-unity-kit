@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using UnityEditor;
 using UnityEditor.UIElements;
@@ -28,6 +29,8 @@ namespace ReExpo92.WorldKit.Editor
 
         List<ReMemoryItem> _items;
         List<ReMemoryItem> _filtered = new List<ReMemoryItem>();
+        // Estado de recreación por pieza (modelo / Addressable / desactualizado).
+        Dictionary<string, UnityBuildState> _states = new Dictionary<string, UnityBuildState>();
         string _loadError;
         bool _loading;
         string _typeFilter = "Todos";
@@ -205,8 +208,8 @@ namespace ReExpo92.WorldKit.Editor
 
             var dl = new Button { name = "dl", text = "⬇" };
             dl.style.flexShrink = 0; dl.style.marginLeft = 4; dl.style.width = 30; dl.style.height = 26;
-            dl.tooltip = "Descargar el contenido Unity de esta re-memoria (próximamente)";
-            dl.clicked += () => { if (r.userData is ReMemoryItem it) Status("busy", "Descargar «" + it.Name + "»: PRÓXIMAMENTE (Addressables)."); };
+            dl.tooltip = "Descargar el GLB aprobado de esta re-memoria a Assets/";
+            dl.clicked += () => { if (r.userData is ReMemoryItem it) DownloadGlb(it); };
             r.Add(dl);
             return r;
         }
@@ -223,6 +226,13 @@ namespace ReExpo92.WorldKit.Editor
             var chips = r.Q("chips"); chips.Clear();
             chips.Add(ReExpoUI.Chip(it.Category ?? "—", "type"));
             chips.Add(ReExpoUI.Chip(StatusLabel(it.Status), StatusKind(it.Status)));
+            // Chip de recreación: desactualizado > recreado > solo modelo.
+            if (_states.TryGetValue(it.Id, out var st))
+            {
+                if (st.Stale) chips.Add(ReExpoUI.Chip("desactualizado", "warn"));
+                else if (st.HasBuild) chips.Add(ReExpoUI.Chip("recreado ✓", "ok"));
+                else if (st.HasModel) chips.Add(ReExpoUI.Chip("modelo 3D", "type"));
+            }
 
             var img = r.Q<Image>("thumb"); img.image = null;
             LoadThumb(img, it.ImageUrl);
@@ -247,6 +257,26 @@ namespace ReExpo92.WorldKit.Editor
             Selection.activeGameObject = poi;
             if (SceneView.lastActiveSceneView != null) SceneView.lastActiveSceneView.FrameSelected();
             Status("ok", "Cámara movida a «" + it.Name + "».");
+        }
+
+        // Descarga el GLB de la última versión aprobada a Assets/ (glTFast lo importa
+        // solo si está instalado). Para construir el Addressable, usa el menú
+        // «re-Expo92 ▸ Constructor de Addressables».
+        async void DownloadGlb(ReMemoryItem it)
+        {
+            Status("busy", $"Buscando el modelo aprobado de «{it.Name}»…");
+            var (url, err) = await ReExpoClient.GetApprovedGlbUrl(it.Id);
+            if (err != null) { Status("err", "Error: " + err); return; }
+            if (string.IsNullOrEmpty(url)) { Status("err", "Esta pieza aún no tiene ninguna versión de modelo aprobada."); return; }
+            Status("busy", "Descargando GLB…");
+            var (bytes, derr) = await SupabaseRest.Download(url);
+            if (derr != null) { Status("err", "Descarga: " + derr); return; }
+            const string dir = "Assets/ReExpo92/Downloads";
+            Directory.CreateDirectory(dir);
+            var path = $"{dir}/rememoria_{it.Id}.glb";
+            File.WriteAllBytes(path, bytes);
+            AssetDatabase.Refresh();
+            Status("ok", $"Descargado en {path}. Con glTFast instalado se importa solo. Para empaquetarlo: menú «Constructor de Addressables».");
         }
 
         void ApplyFilter()
@@ -473,12 +503,14 @@ namespace ReExpo92.WorldKit.Editor
             c.Add(card);
 
             var card2 = ReExpoUI.Card();
-            card2.Add(ReExpoUI.SectionTitle("En desarrollo"));
+            card2.Add(ReExpoUI.SectionTitle("Construir el recinto (Addressables)"));
             card2.Add(ReExpoUI.Para(
-                "Pronto podrás DESCARGAR el contenido Unity de cada re-memoria (su recreación validada) y APORTAR " +
-                "añadidos: modelos 3D, animaciones, partículas o partes sueltas. Los modeladores podrán subir GLB directamente."));
+                "El botón ⬇ de cada re-memoria descarga su GLB aprobado a Assets/ (glTFast lo importa solo). " +
+                "Para empaquetar una pieza en el recinto, usa el menú «re-Expo92 ▸ Constructor de Addressables»: " +
+                "elige la pieza, valida, crea el Addressable y súbelo a revisión (cola UNITY de la web)."));
             card2.Add(ReExpoUI.Warn(
-                "Esta parte (Addressables + flujo de revisión) está por definir a fondo. De momento, los botones ⬇/➕ son un anticipo."));
+                "Si no ves el «Constructor de Addressables», instala las dependencias desde el menú " +
+                "«re-Expo92 ▸ Instalar dependencias de Addressables» (Addressables + glTFast)."));
             c.Add(card2);
         }
 
@@ -536,6 +568,9 @@ namespace ReExpo92.WorldKit.Editor
             _loading = false;
             if (err != null) { _loadError = err; _items = new List<ReMemoryItem>(); }
             else { _items = items ?? new List<ReMemoryItem>(); _loadError = null; }
+            // Estado de recreación (no crítico: si falla, simplemente no se pintan chips).
+            var (states, _) = await ReExpoClient.GetUnityBuildStates();
+            if (states != null) _states = states;
             if (_tab == 0) Rebuild();
         }
 

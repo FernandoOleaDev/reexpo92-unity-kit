@@ -1,0 +1,20 @@
+{
+  "name": "ReExpo92.WorldKit.Addressables.Editor",
+  "rootNamespace": "ReExpo92.WorldKit.Addressables.Editor",
+  "references": [
+    "ReExpo92.WorldKit",
+    "ReExpo92.WorldKit.Editor",
+    "ReExpo92.WorldKit.Addressables",
+    "Unity.Addressables",
+    "Unity.Addressables.Editor",
+    "Unity.ResourceManager"
+  ],
+  "includePlatforms": ["Editor"],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "autoReferenced": true,
+  "defineConstraints": ["REEXPO_ADDR"],
+  "versionDefines": [
+    { "name": "com.unity.addressables", "expression": "", "define": "REEXPO_ADDR" }
+  ]
+}

@@ -154,5 +154,39 @@ namespace ReExpo92.WorldKit
                 return (req.downloadHandler.text, null);
             }
         }
+
+        // ---- descarga de un fichero por URL absoluta (GLB público, catálogo, etc.) ----
+        /// GET de una URL completa y devuelve los bytes (o error).
+        public static async Task<(byte[] data, string error)> Download(string url)
+        {
+            using (var req = UnityWebRequest.Get(url))
+            {
+                req.downloadHandler = new DownloadHandlerBuffer();
+                await SendAsync(req);
+                if (!Ok(req)) return (null, ErrorText(req));
+                return (req.downloadHandler.data, null);
+            }
+        }
+
+        // ---- subida a Storage ----
+        /// PUT a /storage/v1/object/&lt;objectPath&gt; (objectPath incluye el bucket,
+        /// p. ej. "model-addressables/rememoria_x/WebGL/catalog.bin"). x-upsert para
+        /// sobrescribir. Devuelve error o null.
+        public static async Task<string> StoragePut(string objectPath, byte[] bytes, string bearer, string contentType = "application/octet-stream")
+        {
+            var url = ReExpoConfig.SupabaseUrl + "/storage/v1/object/" + objectPath;
+            using (var req = new UnityWebRequest(url, UnityWebRequest.kHttpVerbPUT))
+            {
+                req.uploadHandler = new UploadHandlerRaw(bytes);
+                req.downloadHandler = new DownloadHandlerBuffer();
+                req.SetRequestHeader("apikey", ReExpoConfig.SupabaseAnonKey);
+                req.SetRequestHeader("Authorization", "Bearer " + (bearer ?? ReExpoConfig.SupabaseAnonKey));
+                req.SetRequestHeader("Content-Type", contentType);
+                req.SetRequestHeader("x-upsert", "true");
+                await SendAsync(req);
+                if (!Ok(req)) return ErrorText(req);
+                return null;
+            }
+        }
     }
 }
