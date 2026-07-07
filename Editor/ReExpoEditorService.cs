@@ -232,19 +232,60 @@ namespace ReExpo92.WorldKit.Editor
 
         // ---- instalar dependencias para construir Addressables ----
         /// <summary>
-        /// Instala Unity Addressables (registro oficial). Al terminar, Unity recompila
-        /// y se activa REEXPO_ADDR (la ventana «Constructor de Addressables» aparece).
+        /// ¿Están ya instaladas las dos dependencias de Addressables? Se detecta por
+        /// reflexión (tipos cargados), no por el define REEXPO_ADDR, para que el
+        /// asistente lo sepa aunque él mismo viva fuera de ese define.
         /// </summary>
+        public static bool AddressablesInstalled =>
+            TypeExists("UnityEditor.AddressableAssets.Settings.AddressableAssetSettingsDefaultObject");
+
+        /// glTFast presente (registra el importador de .glb).
+        public static bool GltfastInstalled =>
+            TypeExists("GLTFast.GltfImport") || TypeExists("GLTFast.GltfImport, glTFast");
+
+        /// ¿Ambas listas para empaquetar la recreación?
+        public static bool AddressableDepsReady => AddressablesInstalled && GltfastInstalled;
+
+        static bool TypeExists(string fullName)
+        {
+            if (Type.GetType(fullName) != null) return true;
+            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                try { if (asm.GetType(fullName) != null) return true; }
+                catch { /* algún ensamblado dinámico puede lanzar; ignorar */ }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Instala Unity Addressables + glTFast del registro oficial en UNA sola
+        /// resolución (menos recompilaciones). Al terminar, Unity recompila y se
+        /// activa REEXPO_ADDR → aparecen «Constructor» y «Revisión» de Addressables.
+        /// glTFast registra un importador de .glb, así que los modelos descargados
+        /// se importan solos al caer en Assets/. Devuelve error o null.
+        /// </summary>
+        public static string InstallAddressableDeps()
+        {
+            try
+            {
+                var toAdd = new List<string>(2);
+                if (!AddressablesInstalled) toAdd.Add("com.unity.addressables");
+                if (!GltfastInstalled) toAdd.Add("com.unity.cloud.gltfast");
+                if (toAdd.Count == 0) return null; // ya estaban
+                Client.AddAndRemove(toAdd.ToArray());
+                return null;
+            }
+            catch (Exception e) { return e.Message; }
+        }
+
+        /// <summary>Instala solo Addressables (registro oficial). Compat/uso directo.</summary>
         public static string InstallAddressables()
         {
             try { Client.Add("com.unity.addressables"); return null; }
             catch (Exception e) { return e.Message; }
         }
 
-        /// <summary>
-        /// Instala glTFast (registro oficial). Registra un importador de .glb, así que
-        /// los modelos descargados se importan solos al caer en Assets/.
-        /// </summary>
+        /// <summary>Instala solo glTFast (registro oficial). Compat/uso directo.</summary>
         public static string InstallGltfast()
         {
             try { Client.Add("com.unity.cloud.gltfast"); return null; }

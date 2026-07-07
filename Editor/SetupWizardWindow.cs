@@ -133,6 +133,25 @@ namespace ReExpo92.WorldKit.Editor
             c.Add(ReExpoUI.Check(tmp, tmp ? "TextMeshPro listo (carteles)" : "TextMeshPro: faltan recursos (los carteles no se ven)"));
             if (!tmp)
                 c.Add(ReExpoUI.Primary("Instalar recursos de TextMeshPro", InstallTMP, "⬇"));
+
+            // Herramientas para EMPAQUETAR la recreación (Addressables + glTFast).
+            bool addr = ReExpoEditorService.AddressableDepsReady;
+            c.Add(ReExpoUI.Check(addr, addr
+                ? "Addressables + glTFast listos (empaquetar y subir la recreación)"
+                : "Addressables + glTFast NO instalados (necesarios para el Constructor de Addressables)"));
+            if (!addr)
+            {
+                c.Add(ReExpoUI.Primary("Instalar Addressables + glTFast", InstallAddressableDeps, "⬇"));
+                c.Add(ReExpoUI.Note("Los añadimos por ti desde el registro de Unity en un solo paso. Unity los descarga y recompila solo; al terminar aparecen «Constructor de Addressables» y «Revisión de Addressables», y este check se pone en verde."));
+            }
+        }
+
+        void InstallAddressableDeps()
+        {
+            Status("busy", "Instalando Addressables + glTFast… Unity los descargará y recompilará. Espera unos segundos.");
+            var err = ReExpoEditorService.InstallAddressableDeps();
+            if (err != null) { Status("err", "No se pudieron instalar: " + err); return; }
+            Status("ok", "Añadidos. Unity los instala y recompila solo; al terminar aparecen el Constructor y la Revisión de Addressables.");
         }
 
         void InstallTMP()
